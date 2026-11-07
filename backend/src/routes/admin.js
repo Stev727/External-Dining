@@ -224,15 +224,50 @@ router.post('/orders/reject', auth, async (req, res) => {
   res.json({ code: 0 });
 });
 
-// 看板（管理者视图）
+// 看板（总账 → 月度 → 部门 三层维度）
 router.get('/dashboard', auth, async (req, res) => {
+  const range = ['month', 'year', 'all'].includes(req.query.range) ? req.query.range : 'month';
+  const cond = {
+    month: " AND meal_date >= DATE_FORMAT(CURDATE(),'%Y-%m-01')",
+    year: ' AND meal_date >= MAKEDATE(YEAR(CURDATE()),1)',
+    all: ''
+  }[range];
+
+  // 总账统计卡（范围口径，已分配订单）
+  const [cards] = await pool.query(
+    `SELECT COUNT(*) orders, IFNULL(SUM(headcount),0) headcount, IFNULL(SUM(est_amount),0) est,
+            IFNULL(SUM(actual_amount),0) actual, SUM(actual_amount IS NOT NULL) actualFilled
+     FROM meal_order WHERE status='assigned'${cond}`
+  );
+  // 月度趋势（固定近 12 个月）
+  const [mrows] = await pool.query(
+    `SELECT DATE_FORMAT(meal_date,'%Y-%m') ym, SUM(headcount) headcount, COUNT(*) orders,
+            IFNULL(SUM(est_amount),0) est, IFNULL(SUM(actual_amount),0) actual
+     FROM meal_order
+     WHERE status='assigned' AND meal_date >= DATE_SUB(DATE_FORMAT(CURDATE(),'%Y-%m-01'), INTERVAL 11 MONTH)
+     GROUP BY ym ORDER BY ym DESC`
+  );
+  const keys = [];
+  const now = new Date();
+  for (let i = 0; i < 12; i++) {
+    const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+    keys.push(d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0'));
+  }
+  const mMap = Object.fromEntries(mrows.map(r => [r.ym, r]));
+  const monthly = keys.map(k => mMap[k] || { ym: k, headcount: 0, orders: 0, est: 0, actual: 0 });
+
+  // 被访部门维度（跟随范围）
+  const [byDept] = await pool.query(
+    `SELECT host_dept dept, SUM(headcount) headcount, COUNT(*) orders,
+            IFNULL(SUM(est_amount),0) est, IFNULL(SUM(actual_amount),0) actual
+     FROM meal_order WHERE status='assigned'${cond}
+     GROUP BY host_dept ORDER BY est DESC`
+  );
+
+  // 今日运营视图（保留）
   const [today] = await pool.query(
     `SELECT COUNT(*) cnt, IFNULL(SUM(headcount),0) hc, IFNULL(SUM(est_amount),0) est, IFNULL(SUM(actual_amount),0) actual
      FROM meal_order WHERE status='assigned' AND meal_date=CURDATE()`
-  );
-  const [total] = await pool.query(
-    `SELECT COUNT(*) cnt, IFNULL(SUM(headcount),0) hc, IFNULL(SUM(est_amount),0) est, IFNULL(SUM(actual_amount),0) actual
-     FROM meal_order WHERE status='assigned'`
   );
   const [pending] = await pool.query(
     `SELECT COUNT(*) cnt, IFNULL(SUM(headcount),0) hc FROM meal_order WHERE status='pending' AND meal_date=CURDATE()`
@@ -241,12 +276,12 @@ router.get('/dashboard', auth, async (req, res) => {
     `SELECT assigned_place place, COUNT(*) cnt, SUM(headcount) hc, IFNULL(SUM(est_amount),0) est, IFNULL(SUM(actual_amount),0) actual
      FROM meal_order WHERE status='assigned' AND meal_date=CURDATE() GROUP BY assigned_place`
   );
-  const [byDept] = await pool.query(
+  const [byDeptToday] = await pool.query(
     `SELECT host_dept dept, COUNT(*) cnt, SUM(headcount) hc FROM meal_order WHERE meal_date=CURDATE() AND status != 'rejected' GROUP BY host_dept ORDER BY hc DESC`
   );
   const [recent] = await pool.query('SELECT id, query_code, name, company, host_dept, headcount, meal_date, meal_type, status, created_at FROM meal_order ORDER BY id DESC LIMIT 8');
   const places = await getPlaces();
-  res.json({ code: 0, data: { today: today[0], total: total[0], pending: pending[0], byPlace, byDept, recent, places } });
+  res.json({ code: 0, data: { range, cards: cards[0], monthly, byDept, today: today[0], pending: pending[0], byPlace, byDeptToday, recent, places } });
 });
 
 // 用餐地点维护（支持多食堂）

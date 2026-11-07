@@ -9,6 +9,21 @@
 body { font: 14px/1.6 -apple-system, "PingFang SC", "Microsoft YaHei", sans-serif; background: #f5f6f8; color: #333; }
 .login-box { max-width: 360px; margin: 120px auto; background: #fff; border-radius: 12px; padding: 32px; box-shadow: 0 2px 12px rgba(0,0,0,.06); }
 .login-box h2 { font-size: 18px; margin-bottom: 20px; }
+.dash-range { margin-bottom: 12px; display: flex; gap: 8px; align-items: center; }
+.dash-range button { padding: 4px 18px; border-radius: 16px; }
+.dash-range button.on { background: #185FA5; color: #fff; border-color: #185FA5; }
+.mchart { display: flex; align-items: flex-end; gap: 6px; height: 150px; padding: 8px 4px 0; }
+.mcol { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: flex-end; }
+.mbar { width: 68%; background: #378ADD; border-radius: 4px 4px 0 0; min-height: 2px; }
+.mbar:hover { background: #185FA5; }
+.mval { font-size: 11px; color: #185FA5; font-weight: 600; margin-bottom: 3px; }
+.mlab { font-size: 11px; color: #98a2b3; margin-top: 5px; }
+.drow { display: flex; align-items: center; gap: 12px; padding: 7px 0; border-bottom: 1px dashed #eef1f5; }
+.drow:last-child { border-bottom: none; }
+.dname { width: 110px; font-size: 13px; color: #40506a; }
+.dbar { flex: 1; background: #F0F3F8; border-radius: 6px; height: 18px; overflow: hidden; }
+.dbar div { height: 100%; background: #639922; border-radius: 6px; }
+.dnum { width: 280px; font-size: 12px; color: #666; white-space: nowrap; }
 input, select { width: 100%; padding: 9px 12px; border: 1px solid #d9dce3; border-radius: 8px; font-size: 14px; margin-bottom: 12px; }
 button { padding: 8px 16px; border: 1px solid #d9dce3; border-radius: 8px; background: #fff; cursor: pointer; font-size: 13px; }
 button.primary { background: #185fa5; color: #fff; border-color: #185fa5; }
@@ -80,7 +95,23 @@ textarea { width: 100%; min-height: 60px; padding: 9px 12px; border: 1px solid #
 
   <!-- 看板 -->
   <div id="tab-dash">
+    <div class="dash-range">
+      <span style="color:#666;font-size:13px">统计范围：</span>
+      <button id="rgMonth" onclick="setRange('month')">本月</button>
+      <button id="rgYear" onclick="setRange('year')">今年</button>
+      <button id="rgAll" onclick="setRange('all')">全部</button>
+      <span style="color:#999;font-size:12px;margin-left:6px">金额与部门维度跟随范围；月度趋势固定近 12 个月</span>
+    </div>
     <div class="dash-grid" id="dashCards"></div>
+    <div class="card">
+      <h3>月度就餐人数（近 12 个月）</h3>
+      <div id="monthChart"></div>
+      <table style="margin-top:6px"><thead><tr><th>月份</th><th>就餐人数</th><th>单数</th><th>预计金额</th><th>真实金额</th></tr></thead><tbody id="mBody"></tbody></table>
+    </div>
+    <div class="card">
+      <h3>被访部门 · 人数与金额（<span id="rgLabel">本月</span>）</h3>
+      <div id="deptChart"></div>
+    </div>
     <div class="two-col">
       <div class="card"><h3>今日 · 按地点</h3><table><thead><tr id="dpHead"></tr></thead><tbody id="dpBody"></tbody></table></div>
       <div class="card"><h3>今日 · 按被访部门</h3><table><thead><tr><th>部门</th><th>单数</th><th>人数</th></tr></thead><tbody id="ddBody"></tbody></table></div>
@@ -276,24 +307,41 @@ async function focusOrder(id) {
   }
 }
 
-// ===== 看板 =====
+// ===== 看板（总账 → 月度 → 部门，图形化） =====
+let dashRange = 'month';
+function setRange(r) { dashRange = r; loadDash(); }
 async function loadDash() {
-  const r = await api('/api/admin/dashboard');
+  const r = await api('/api/admin/dashboard?range=' + dashRange);
   const d = r.data;
-  const cards = [
-    { lbl: '今日已分配', num: d.today.cnt, sub: `${d.today.hc} 人`, cls: '' },
-    { lbl: '今日待分配', num: d.pending.cnt, sub: `${d.pending.hc} 人`, cls: d.pending.cnt ? 'orange' : '' },
-    { lbl: '今日预计消费', num: '¥' + d.today.est, sub: '按单价快照', cls: '' },
-    { lbl: '今日真实消费', num: '¥' + d.today.actual, sub: '就餐后录入', cls: 'green' },
-    { lbl: '累计已分配', num: d.total.cnt, sub: `${d.total.hc} 人 ｜ 累计预计 ¥${d.total.est} ｜ 真实 ¥${d.total.actual}`, cls: '' }
-  ];
-  $('dashCards').innerHTML = cards.map(c =>
-    `<div class="stat-card"><div class="num ${c.cls}">${c.num}</div><div class="lbl">${c.lbl}${c.sub ? ' · ' + c.sub : ''}</div></div>`).join('');
+  const RN = { month: '本月', year: '今年', all: '全部' };
+  ['month', 'year', 'all'].forEach(k => { const b = $('rg' + k[0].toUpperCase() + k.slice(1)); if (b) b.className = k === dashRange ? 'on' : ''; });
+  $('rgLabel').textContent = RN[dashRange];
+
+  const c = d.cards;
+  const fmt = n => (+n || 0).toLocaleString();
+  $('dashCards').innerHTML = [
+    { lbl: '就餐总人数', num: c.headcount, sub: `${c.orders} 单 ｜ 范围：${RN[dashRange]}`, cls: '' },
+    { lbl: '预计总金额（总部）', num: '¥' + fmt(c.est), sub: '人数 × 地点单价快照', cls: '' },
+    { lbl: '真实总金额（总部）', num: '¥' + fmt(c.actual), sub: `已录入 ${c.actualFilled || 0} / ${c.orders} 单`, cls: 'green' }
+  ].map(x => `<div class="stat-card"><div class="num ${x.cls}">${x.num}</div><div class="lbl">${x.lbl}<br><span style="font-size:11px;color:#98a2b3;font-weight:400">${x.sub}</span></div></div>`).join('');
+
+  const mx = Math.max(...d.monthly.map(m => +m.headcount), 1);
+  $('monthChart').innerHTML = '<div class="mchart">' + d.monthly.map(m =>
+    `<div class="mcol"><div class="mval">${+m.headcount || ''}</div><div class="mbar" style="height:${Math.max(2, Math.round(+m.headcount / mx * 100))}px" title="${m.ym}：${m.headcount} 人 · ${m.orders} 单"></div><div class="mlab">${m.ym.slice(2)}</div></div>`).join('') + '</div>';
+  $('mBody').innerHTML = d.monthly.map(m =>
+    `<tr><td>${m.ym}</td><td><b>${m.headcount}</b></td><td>${m.orders}</td><td>¥${fmt(m.est)}</td><td>${+m.actual ? '¥' + fmt(m.actual) : '-'}</td></tr>`).join('');
+
+  const me = Math.max(...d.byDept.map(x => +x.est), 1);
+  $('deptChart').innerHTML = d.byDept.length ? d.byDept.map(x =>
+    `<div class="drow"><div class="dname">${x.dept}</div><div class="dbar"><div style="width:${Math.max(2, Math.round(+x.est / me * 100))}%"></div></div>
+     <div class="dnum"><b>${x.headcount}</b> 人 · ${x.orders} 单 ｜ 预计 ¥${fmt(x.est)} ｜ 真实 ${+x.actual ? '¥' + fmt(x.actual) : '未录入'}</div></div>`).join('')
+    : '<div style="color:#999;text-align:center;padding:16px">该时间范围暂无已分配数据</div>';
+
   $('dpHead').innerHTML = '<th>地点</th><th>单数</th><th>人数</th><th>预计</th><th>真实</th>';
   $('dpBody').innerHTML = d.byPlace.length ? d.byPlace.map(x =>
     `<tr><td>${d.places[x.place] || x.place}</td><td>${x.cnt}</td><td><b>${x.hc}</b></td><td>¥${x.est}</td><td>${+x.actual ? '¥' + x.actual : '-'}</td></tr>`).join('')
     : '<tr><td colspan="5" style="color:#999;text-align:center">今日暂无已分配订单</td></tr>';
-  $('ddBody').innerHTML = d.byDept.length ? d.byDept.map(x =>
+  $('ddBody').innerHTML = d.byDeptToday.length ? d.byDeptToday.map(x =>
     `<tr><td>${x.dept}</td><td>${x.cnt}</td><td><b>${x.hc}</b></td></tr>`).join('')
     : '<tr><td colspan="3" style="color:#999;text-align:center">今日暂无数据</td></tr>';
   const MEAL = { breakfast: '早', lunch: '午', dinner: '晚' };
