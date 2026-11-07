@@ -23,7 +23,7 @@ async function getConfig(key) {
     cfgCache = Object.fromEntries(rows.map(r => [r.cfg_key, r.cfg_value]));
     cfgCacheAt = Date.now();
   }
-  // 环境变量优先（敏感信息不入库）
+  // 优先取配置表（管理端界面可配置），环境变量兜底（首次部署引导用）
   const envMap = {
     wx_appid: process.env.WX_APPID,
     wx_appsecret: process.env.WX_APPSECRET,
@@ -36,8 +36,9 @@ async function getConfig(key) {
     admin_password: process.env.ADMIN_PASSWORD,
     admin_base_url: process.env.ADMIN_BASE_URL
   };
-  if (envMap[key]) return envMap[key];
-  return cfgCache ? cfgCache[key] : undefined;
+  const v = cfgCache ? cfgCache[key] : undefined;
+  if (v !== undefined && v !== '') return v;
+  return envMap[key];
 }
 
 async function invalidateConfigCache() {

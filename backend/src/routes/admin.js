@@ -382,6 +382,34 @@ router.post('/dept', auth, requireAdmin, async (req, res) => {
   res.json({ code: 0 });
 });
 
+// ===== 系统设置（仅管理员）：钉钉应用信息等，推广部署时每家公司在界面各自配置 =====
+const SETTING_KEYS = ['dingtalk_appkey', 'dingtalk_appsecret', 'dingtalk_agent_id', 'dingtalk_webhook', 'dingtalk_secret', 'admin_base_url'];
+const SECRET_KEYS = ['dingtalk_appsecret', 'dingtalk_secret'];
+function maskSecret(v) {
+  if (!v) return '';
+  v = String(v);
+  return v.length <= 6 ? '••••••' : v.slice(0, 2) + '••••••' + v.slice(-4);
+}
+router.get('/settings', auth, requireAdmin, async (req, res) => {
+  const out = {};
+  for (const k of SETTING_KEYS) {
+    let v = await getConfig(k);
+    if (SECRET_KEYS.includes(k)) v = maskSecret(v);
+    out[k] = v || '';
+  }
+  res.json({ code: 0, data: out });
+});
+router.post('/settings', auth, requireAdmin, async (req, res) => {
+  for (const k of SETTING_KEYS) {
+    if (!(k in req.body)) continue;
+    const v = String(req.body[k] ?? '').trim();
+    if (SECRET_KEYS.includes(k) && (!v || v.includes('•'))) continue; // 掩码原样传回 = 不修改
+    await pool.query('INSERT INTO meal_config (cfg_key, cfg_value) VALUES (?,?) ON DUPLICATE KEY UPDATE cfg_value=VALUES(cfg_value)', [k, v]);
+  }
+  invalidateConfigCache();
+  res.json({ code: 0 });
+});
+
 // 路线图维护
 router.get('/route-map', auth, async (req, res) => {
   const [rows] = await pool.query('SELECT * FROM meal_route_map WHERE enabled=1 ORDER BY place, sort');

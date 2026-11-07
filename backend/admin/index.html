@@ -95,6 +95,7 @@ textarea { width: 100%; min-height: 60px; padding: 9px 12px; border: 1px solid #
     <div class="tab" data-tab="area" onclick="switchTab('area')" data-admin="1">区域与成员</div>
     <div class="tab" data-tab="dept" onclick="switchTab('dept')" data-admin="1">被访部门</div>
     <div class="tab" data-tab="users" onclick="switchTab('users')" data-admin="1">用户管理</div>
+    <div class="tab" data-tab="settings" onclick="switchTab('settings')" data-admin="1">系统设置</div>
   </div>
 
   <!-- 看板 -->
@@ -209,6 +210,29 @@ textarea { width: 100%; min-height: 60px; padding: 9px 12px; border: 1px solid #
       <table><thead><tr><th>用户名</th><th>角色</th><th>手机号</th><th>状态</th><th>创建时间</th><th>操作</th></tr></thead><tbody id="userBody"></tbody></table>
     </div>
   </div>
+
+  <!-- 系统设置 -->
+  <div id="tab-settings" style="display:none">
+    <div class="card">
+      <h3>钉钉应用配置</h3>
+      <div class="row"><b style="width:130px">AppKey：</b><input id="stAppkey" style="width:320px" placeholder="企业内部应用 AppKey"></div>
+      <div class="row"><b style="width:130px">AppSecret：</b><input id="stSecret" style="width:320px" type="password" placeholder="留空或保持掩码不变 = 不修改"><span style="color:#999;font-size:12px">已保存的值以掩码显示</span></div>
+      <div class="row"><b style="width:130px">AgentId：</b><input id="stAgent" style="width:200px" placeholder="应用 AgentId"></div>
+      <span style="color:#999;font-size:12px">用于机器人单聊/工作通知推送；修改后立即生效（推送新订单时使用新配置）</span>
+    </div>
+    <div class="card">
+      <h3>通知与管理端地址</h3>
+      <div class="row"><b style="width:130px">管理端地址：</b><input id="stBase" style="width:380px" placeholder="如 https://meal.xxx.com/admin/"></div>
+      <span style="color:#999;font-size:12px">钉钉通知里"点此登录管理端"链接使用该地址；正式环境配置公网 HTTPS 地址</span>
+    </div>
+    <div class="card">
+      <h3>群机器人 Webhook（备用通道，选填）</h3>
+      <div class="row"><b style="width:130px">Webhook：</b><input id="stWebhook" style="width:380px" placeholder="机器人 Webhook 地址，不启用则留空"></div>
+      <div class="row"><b style="width:130px">加签密钥：</b><input id="stWSecret" style="width:320px" type="password" placeholder="留空或保持掩码不变 = 不修改"></div>
+      <span style="color:#999;font-size:12px">机器人单聊/工作通知失败时降级使用；只推群聊场景才需要</span>
+      <div class="row" style="margin-top:12px"><button class="primary" onclick="saveSettings()">保存全部设置</button></div>
+    </div>
+  </div>
 </div>
 
 <script>
@@ -255,13 +279,39 @@ function switchTab(t) {
     routeDirty = false;
   }
   document.querySelectorAll('.tab').forEach(e => e.classList.toggle('active', e.dataset.tab === t));
-  ['dash', 'orders', 'place', 'area', 'dept', 'users'].forEach(k => { const el = $('tab-' + k); if (el) el.style.display = k === t ? '' : 'none'; });
+  ['dash', 'orders', 'place', 'area', 'dept', 'users', 'settings'].forEach(k => { const el = $('tab-' + k); if (el) el.style.display = k === t ? '' : 'none'; });
   if (t === 'dash') loadDash();
   if (t === 'orders') { loadOrders(); loadSummary(); }
   if (t === 'place') renderPlaceCards();
   if (t === 'area') loadAreas();
   if (t === 'dept') loadDepts();
   if (t === 'users') loadUsers();
+  if (t === 'settings') loadSettings();
+}
+
+// ===== 系统设置 =====
+async function loadSettings() {
+  const r = await api('/api/admin/settings');
+  if (r.code !== 0) return toast(r.msg);
+  const s = r.data;
+  $('stAppkey').value = s.dingtalk_appkey || '';
+  $('stSecret').value = s.dingtalk_appsecret || '';
+  $('stAgent').value = s.dingtalk_agent_id || '';
+  $('stBase').value = s.admin_base_url || '';
+  $('stWebhook').value = s.dingtalk_webhook || '';
+  $('stWSecret').value = s.dingtalk_secret || '';
+}
+async function saveSettings() {
+  const r = await api('/api/admin/settings', { method: 'POST', body: {
+    dingtalk_appkey: $('stAppkey').value.trim(),
+    dingtalk_appsecret: $('stSecret').value.trim(),
+    dingtalk_agent_id: $('stAgent').value.trim(),
+    admin_base_url: $('stBase').value.trim(),
+    dingtalk_webhook: $('stWebhook').value.trim(),
+    dingtalk_secret: $('stWSecret').value.trim()
+  } });
+  if (r.code === 0) { toast('设置已保存，立即生效'); loadSettings(); }
+  else toast(r.msg);
 }
 
 // ===== 用户管理 =====
