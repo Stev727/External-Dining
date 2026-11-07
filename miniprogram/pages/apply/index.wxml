@@ -1,0 +1,67 @@
+<view wx:if="{{!success}}">
+  <view class="form-card">
+    <view class="form-item">
+      <view class="form-label"><text class="req">*</text>用餐日期</view>
+      <picker range="{{dates}}" range-key="label" value="{{dateIndex}}" bindchange="onDateChange">
+        <view>{{dates[dateIndex].label}}</view>
+      </picker>
+    </view>
+    <view class="form-item">
+      <view class="form-label"><text class="req">*</text>用餐餐别</view>
+      <view class="meals">
+        <view wx:for="{{meals}}" wx:key="key" class="meal-tag {{item.on ? 'on' : ''}}" data-key="{{item.key}}" bindtap="toggleMeal">{{item.name}}</view>
+      </view>
+    </view>
+    <view class="form-item">
+      <view class="form-label"><text class="req">*</text>姓名</view>
+      <input placeholder="请输入姓名" value="{{form.name}}" data-field="name" bindinput="onInput" bindblur="onInput" />
+    </view>
+    <view class="form-item">
+      <view class="form-label"><text class="req">*</text>电话</view>
+      <input wx:if="{{!form.phone}}" type="number" placeholder="输入或点击右侧一键获取" value="{{form.phone}}" data-field="phone" bindinput="onInput" />
+      <input wx:else type="number" value="{{form.phone}}" data-field="phone" bindinput="onInput" />
+      <button wx:if="{{!form.phone}}" style="margin-left:16rpx;font-size:24rpx;padding:0 20rpx;line-height:56rpx" open-type="getPhoneNumber" bindgetphonenumber="onGetPhone">一键获取</button>
+    </view>
+    <view class="form-item">
+      <view class="form-label"><text class="req">*</text>工作单位/部门</view>
+      <input placeholder="如：XX公司 研发部" value="{{form.company}}" data-field="company" bindinput="onInput" />
+    </view>
+    <view class="form-item">
+      <view class="form-label"><text class="req">*</text>所属区域</view>
+      <picker range="{{areas}}" range-key="name" value="{{areaIndex}}" bindchange="onAreaChange">
+        <view>{{areaIndex >= 0 ? areas[areaIndex].name : '请选择要访问的区域'}}</view>
+      </picker>
+    </view>
+    <view class="form-item">
+      <view class="form-label"><text class="req">*</text>被访问人</view>
+      <input placeholder="对接人姓名" value="{{form.visit_to}}" data-field="visit_to" bindinput="onInput" />
+    </view>
+    <view class="form-item">
+      <view class="form-label"><text class="req">*</text>接待部门</view>
+      <picker range="{{depts}}" value="{{deptIndex}}" bindchange="onDeptChange">
+        <view>{{deptIndex >= 0 ? depts[deptIndex] : '请选择中坚接待部门'}}</view>
+      </picker>
+    </view>
+    <view class="form-item">
+      <view class="form-label">人数</view>
+      <input type="number" value="{{form.headcount}}" data-field="headcount" bindinput="onInput" />
+    </view>
+    <view class="form-item">
+      <view class="form-label">备注</view>
+      <input placeholder="忌口、到达时间等（选填）" value="{{form.remark}}" data-field="remark" bindinput="onInput" />
+    </view>
+  </view>
+  <view class="btn-area">
+    <button class="btn-primary" disabled="{{submitting}}" bindtap="submit">{{submitting ? '提交中...' : '提交订餐'}}</button>
+  </view>
+  <view class="tip">提交后由接待部门为您分配用餐地点，分配结果可在「订餐查询」查看。</view>
+</view>
+
+<view wx:else class="success-box">
+  <view style="font-size:32rpx">提交成功 🎉</view>
+  <view style="font-size:26rpx;color:#888;margin-top:10rpx">您的查询凭证码（请截图保存）</view>
+  <view class="success-code">{{queryCode}}</view>
+  <view style="font-size:26rpx;color:#888">地点分配完成后可凭此码查询，也将通过微信服务通知推送</view>
+  <button class="btn-primary" style="margin-top:40rpx" bindtap="goQuery">查看订餐状态</button>
+  <button style="margin-top:20rpx;background:#fff;color:#185fa5;border:1rpx solid #185fa5;border-radius:44rpx" bindtap="again">再填一单</button>
+</view>

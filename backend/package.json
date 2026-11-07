@@ -1,0 +1,20 @@
+{
+  "name": "meal-order-server",
+  "version": "1.0.0",
+  "private": true,
+  "description": "外部人员订餐系统后端（小程序+管理端共用）",
+  "main": "src/server.js",
+  "scripts": {
+    "start": "node src/server.js",
+    "init-db": "node src/init-db.js"
+  },
+  "dependencies": {
+    "axios": "^1.7.0",
+    "dotenv": "^16.4.0",
+    "exceljs": "^4.4.0",
+    "express": "^4.19.0",
+    "jsonwebtoken": "^9.0.0",
+    "multer": "^1.4.5-lts.1",
+    "mysql2": "^3.10.0"
+  }
+}

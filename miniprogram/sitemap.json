@@ -1,0 +1,1 @@
+{ "desc": "外部人员订餐", "rules": [{ "action": "allow", "page": "*" }] }

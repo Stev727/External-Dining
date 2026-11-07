@@ -1,0 +1,473 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>订餐管理端</title>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font: 14px/1.6 -apple-system, "PingFang SC", "Microsoft YaHei", sans-serif; background: #f5f6f8; color: #333; }
+.login-box { max-width: 360px; margin: 120px auto; background: #fff; border-radius: 12px; padding: 32px; box-shadow: 0 2px 12px rgba(0,0,0,.06); }
+.login-box h2 { font-size: 18px; margin-bottom: 20px; }
+input, select { width: 100%; padding: 9px 12px; border: 1px solid #d9dce3; border-radius: 8px; font-size: 14px; margin-bottom: 12px; }
+button { padding: 8px 16px; border: 1px solid #d9dce3; border-radius: 8px; background: #fff; cursor: pointer; font-size: 13px; }
+button.primary { background: #185fa5; color: #fff; border-color: #185fa5; }
+button.danger { color: #a32d2d; border-color: #e2b4b4; }
+button:disabled { opacity: .5; cursor: not-allowed; }
+.wrap { max-width: 1280px; margin: 0 auto; padding: 20px; }
+.topbar { display: flex; align-items: center; gap: 12px; margin-bottom: 16px; }
+.topbar h1 { font-size: 17px; margin-right: auto; }
+.tabs { display: flex; gap: 4px; margin-bottom: 14px; border-bottom: 1px solid #e5e7eb; flex-wrap: wrap; }
+.tab { padding: 8px 16px; cursor: pointer; border-bottom: 2px solid transparent; }
+.tab.active { border-color: #185fa5; color: #185fa5; font-weight: 500; }
+table { width: 100%; border-collapse: collapse; background: #fff; border-radius: 8px; overflow: hidden; }
+th, td { padding: 9px 10px; border-bottom: 1px solid #eef0f3; text-align: left; font-size: 13px; }
+th { background: #e7f3fc; color: #333; font-weight: 500; white-space: nowrap; }
+td { max-width: 180px; word-break: break-all; }
+.tag { display: inline-block; padding: 1px 8px; border-radius: 10px; font-size: 12px; }
+.tag.pending { background: #faeeda; color: #854f0b; }
+.tag.assigned { background: #e1f5ee; color: #0f6e56; }
+.tag.rejected { background: #fcebeb; color: #a32d2d; }
+.tag.off { background: #f1efe8; color: #888; }
+.toolbar { display: flex; gap: 8px; margin: 10px 0; flex-wrap: wrap; align-items: center; }
+.toolbar input, .toolbar select { margin: 0; height: 37px; width: auto; }
+.card { background: #fff; border-radius: 12px; padding: 20px; margin-bottom: 16px; }
+.card h3 { font-size: 15px; margin-bottom: 14px; }
+.row { display: flex; gap: 10px; align-items: center; margin-bottom: 10px; flex-wrap: wrap; }
+.row input, .row select { width: auto; margin: 0; }
+.msg { position: fixed; top: 20px; left: 50%; transform: translateX(-50%); background: #333; color: #fff; padding: 8px 20px; border-radius: 8px; display: none; z-index: 99; }
+.imgs { display: flex; gap: 8px; flex-wrap: wrap; }
+.imgs .it { position: relative; }
+.imgs img { width: 90px; height: 68px; object-fit: cover; border-radius: 6px; }
+.imgs .del { position: absolute; top: -6px; right: -6px; width: 18px; height: 18px; border-radius: 50%; background: #a32d2d; color: #fff; border: none; font-size: 11px; line-height: 18px; padding: 0; }
+textarea { width: 100%; min-height: 60px; padding: 9px 12px; border: 1px solid #d9dce3; border-radius: 8px; font: inherit; }
+.sum-wrap { margin-bottom: 14px; }
+.sum-wrap h3 { font-size: 14px; margin-bottom: 8px; color: #0f6e56; }
+.total-row td { font-weight: 500; background: #f5f9fd; }
+.dash-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 12px; margin-bottom: 16px; }
+.stat-card { background: #fff; border-radius: 12px; padding: 18px 20px; }
+.stat-card .num { font-size: 26px; font-weight: 600; color: #185fa5; }
+.stat-card .num.green { color: #0f6e56; }
+.stat-card .num.orange { color: #854f0b; }
+.stat-card .lbl { font-size: 13px; color: #888; margin-top: 2px; }
+.two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+@media (max-width: 900px) { .two-col { grid-template-columns: 1fr; } }
+</style>
+</head>
+<body>
+<div class="msg" id="msg"></div>
+
+<div class="login-box" id="loginBox">
+  <h2>订餐管理端</h2>
+  <input type="password" id="pwd" placeholder="管理口令" onkeydown="if(event.key==='Enter')login()">
+  <button class="primary" style="width:100%" onclick="login()">登 录</button>
+</div>
+
+<div class="wrap" id="main" style="display:none">
+  <div class="topbar">
+    <h1>外部人员订餐 · 管理端</h1>
+    <button onclick="logout()">退出</button>
+  </div>
+  <div class="tabs">
+    <div class="tab active" data-tab="dash" onclick="switchTab('dash')">看板</div>
+    <div class="tab" data-tab="orders" onclick="switchTab('orders')">订餐记录</div>
+    <div class="tab" data-tab="place" onclick="switchTab('place')">地点与路线</div>
+    <div class="tab" data-tab="area" onclick="switchTab('area')">区域与成员</div>
+    <div class="tab" data-tab="dept" onclick="switchTab('dept')">接待部门</div>
+  </div>
+
+  <!-- 看板 -->
+  <div id="tab-dash">
+    <div class="dash-grid" id="dashCards"></div>
+    <div class="two-col">
+      <div class="card"><h3>今日 · 按地点</h3><table><thead><tr id="dpHead"></tr></thead><tbody id="dpBody"></tbody></table></div>
+      <div class="card"><h3>今日 · 按接待部门</h3><table><thead><tr><th>部门</th><th>单数</th><th>人数</th></tr></thead><tbody id="ddBody"></tbody></table></div>
+    </div>
+    <div class="card"><h3>最新提交</h3><table><thead><tr><th>时间</th><th>姓名</th><th>单位/部门</th><th>接待部门</th><th>用餐日期</th><th>餐别</th><th>人数</th><th>状态</th></tr></thead><tbody id="drBody"></tbody></table></div>
+  </div>
+
+  <!-- 订餐记录 + 统计 -->
+  <div id="tab-orders" style="display:none">
+    <div class="toolbar">
+      <input type="date" id="fDate" style="width:150px" onchange="reloadOrders()">
+      <select id="fStatus" style="width:120px" onchange="loadOrders()">
+        <option value="">全部状态</option>
+        <option value="pending">待分配</option>
+        <option value="assigned">已分配</option>
+        <option value="rejected">已拒绝</option>
+      </select>
+      <button class="primary" onclick="batchAssign()">批量分配选中</button>
+      <select id="assignPlace" style="width:150px"></select>
+      <button onclick="batchUnassign()">取消分配选中</button>
+      <button class="danger" onclick="batchReject()">拒绝选中</button>
+      <button onclick="exportExcel()">导出 Excel</button>
+      <span id="selCount" style="color:#888"></span>
+    </div>
+    <div class="sum-wrap" id="summaryBox" style="display:none">
+      <h3>📊 分配统计</h3>
+      <table><thead><tr id="sumHead"></tr></thead><tbody id="sumBody"></tbody></table>
+    </div>
+    <table>
+      <thead><tr>
+        <th><input type="checkbox" onchange="toggleAll(this)"></th>
+        <th>日期</th><th>餐别</th><th>姓名</th><th>电话</th><th>单位/部门</th>
+        <th>接待部门</th><th>人数</th><th>状态</th><th>地点</th><th>预计金额</th><th>真实金额</th><th>推送</th><th>被访问人</th><th>备注</th><th>操作</th><th>凭证码</th>
+      </tr></thead>
+      <tbody id="orderBody"></tbody>
+    </table>
+  </div>
+
+  <!-- 地点与路线（合并） -->
+  <div id="tab-place" style="display:none">
+    <div class="card">
+      <h3>添加用餐地点</h3>
+      <div class="row">
+        <input id="newPlace" placeholder="地点名称，如：二食堂" style="width:180px">
+        <input id="newPlacePrice" placeholder="人均单价（元）" style="width:130px" type="number" step="0.01">
+        <button class="primary" onclick="addPlace()">添加</button>
+        <span style="color:#999;font-size:12px">单价用于"预计金额 = 人数 × 单价"，分配时自动快照；改价只影响之后的新分配</span>
+      </div>
+    </div>
+    <div id="routeCards"></div>
+  </div>
+
+  <!-- 区域与成员 -->
+  <div id="tab-area" style="display:none">
+    <div class="card">
+      <h3>添加区域</h3>
+      <div class="row">
+        <input id="newArea" placeholder="区域名称，如：A区/二工厂" style="width:200px">
+        <button class="primary" onclick="addArea()">添加</button>
+        <span style="color:#999;font-size:12px">外部人员填报时选择区域；提交后钉钉通知自动发给该区域的成员</span>
+      </div>
+    </div>
+    <div id="areaCards"></div>
+  </div>
+
+  <!-- 接待部门 -->
+  <div id="tab-dept" style="display:none">
+    <div class="card">
+      <h3>接待部门选项（小程序下拉）</h3>
+      <div class="row"><input id="newDept" placeholder="部门名称" style="width:200px"><button class="primary" onclick="addDept()">添加</button></div>
+      <div id="deptList" class="row"></div>
+    </div>
+  </div>
+</div>
+
+<script>
+let token = sessionStorage.getItem('meal_token') || '';
+let places = [];
+let depts = [];
+let checked = new Set();
+let routeDel = {};
+let routeDirty = false;   // 地点图片有未保存更改
+
+const $ = id => document.getElementById(id);
+function toast(m) { const el = $('msg'); el.textContent = m; el.style.display = 'block'; setTimeout(() => el.style.display = 'none', 3000); }
+async function api(path, opt = {}) {
+  const res = await fetch(path, {
+    ...opt,
+    headers: { ...(opt.headers || {}), Authorization: 'Bearer ' + token, ...(opt.body && !(opt.body instanceof FormData) ? { 'Content-Type': 'application/json' } : {}) },
+    body: opt.body instanceof FormData ? opt.body : (opt.body ? JSON.stringify(opt.body) : undefined)
+  });
+  if (res.status === 401) { logout(); throw new Error('登录失效'); }
+  return res.json();
+}
+
+async function login() {
+  const r = await fetch('/api/admin/login', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ password: $('pwd').value }) }).then(r => r.json());
+  if (r.code !== 0) return toast(r.msg || '登录失败');
+  token = r.data.token; sessionStorage.setItem('meal_token', token);
+  $('loginBox').style.display = 'none'; $('main').style.display = 'block';
+  init();
+}
+function logout() { token = ''; sessionStorage.removeItem('meal_token'); location.reload(); }
+
+function switchTab(t) {
+  if (routeDirty && t !== 'place') {
+    if (!confirm('地点图片有未保存的更改，切换后将丢失。确认继续？')) return;
+    routeDirty = false;
+  }
+  document.querySelectorAll('.tab').forEach(e => e.classList.toggle('active', e.dataset.tab === t));
+  ['dash', 'orders', 'place', 'area', 'dept'].forEach(k => $('tab-' + k).style.display = k === t ? '' : 'none');
+  if (t === 'dash') loadDash();
+  if (t === 'orders') { loadOrders(); loadSummary(); }
+  if (t === 'place') renderPlaceCards();
+  if (t === 'area') loadAreas();
+  if (t === 'dept') loadDepts();
+}
+
+// ===== 看板 =====
+async function loadDash() {
+  const r = await api('/api/admin/dashboard');
+  const d = r.data;
+  const cards = [
+    { lbl: '今日已分配', num: d.today.cnt, sub: `${d.today.hc} 人`, cls: '' },
+    { lbl: '今日待分配', num: d.pending.cnt, sub: `${d.pending.hc} 人`, cls: d.pending.cnt ? 'orange' : '' },
+    { lbl: '今日预计消费', num: '¥' + d.today.est, sub: '按单价快照', cls: '' },
+    { lbl: '今日真实消费', num: '¥' + d.today.actual, sub: '就餐后录入', cls: 'green' },
+    { lbl: '累计已分配', num: d.total.cnt, sub: `${d.total.hc} 人 ｜ 累计预计 ¥${d.total.est} ｜ 真实 ¥${d.total.actual}`, cls: '' }
+  ];
+  $('dashCards').innerHTML = cards.map(c =>
+    `<div class="stat-card"><div class="num ${c.cls}">${c.num}</div><div class="lbl">${c.lbl}${c.sub ? ' · ' + c.sub : ''}</div></div>`).join('');
+  $('dpHead').innerHTML = '<th>地点</th><th>单数</th><th>人数</th><th>预计</th><th>真实</th>';
+  $('dpBody').innerHTML = d.byPlace.length ? d.byPlace.map(x =>
+    `<tr><td>${d.places[x.place] || x.place}</td><td>${x.cnt}</td><td><b>${x.hc}</b></td><td>¥${x.est}</td><td>${+x.actual ? '¥' + x.actual : '-'}</td></tr>`).join('')
+    : '<tr><td colspan="5" style="color:#999;text-align:center">今日暂无已分配订单</td></tr>';
+  $('ddBody').innerHTML = d.byDept.length ? d.byDept.map(x =>
+    `<tr><td>${x.dept}</td><td>${x.cnt}</td><td><b>${x.hc}</b></td></tr>`).join('')
+    : '<tr><td colspan="3" style="color:#999;text-align:center">今日暂无数据</td></tr>';
+  const MEAL = { breakfast: '早', lunch: '午', dinner: '晚' };
+  $('drBody').innerHTML = d.recent.map(o =>
+    `<tr><td>${(o.created_at || '').slice(5, 16)}</td><td>${o.name}</td><td>${o.company}</td><td>${o.host_dept}</td><td>${o.meal_date}</td><td>${o.meal_type.split(',').map(m => MEAL[m] || m).join('')}</td><td>${o.headcount}</td><td><span class="tag ${o.status}">${{pending:'待分配',assigned:'已分配',rejected:'已拒绝'}[o.status]}</span></td></tr>`).join('');
+}
+
+// ===== 用餐地点 + 路线图（合并卡片） =====
+async function loadPlaces() {
+  const r = await api('/api/admin/places');
+  places = r.data;
+  $('assignPlace').innerHTML = places.filter(p => p.enabled).map(p => `<option value="${p.code}">分配到：${p.name}</option>`).join('');
+}
+async function renderPlaceCards() {
+  const pr = await api('/api/admin/places');
+  places = pr.data;
+  const rr = await api('/api/admin/route-map');
+  const rows = rr.data;
+  $('routeCards').innerHTML = places.filter(p => p.enabled).map(p => {
+    const list = rows.filter(x => x.place === p.code);
+    const main = list.find(x => x.sort === 0);
+    const imgs = list.filter(x => x.img_path).map(x =>
+      `<div class="it"><img src="${x.img_path}"><button class="del" onclick="delImg('${p.code}',${x.id})">×</button></div>`).join('');
+    return `<div class="card">
+      <h3>${p.name} <span style="font-weight:400;color:#888;font-size:13px">｜ 人均单价 ¥${p.price ?? 0} <button style="padding:2px 8px" onclick="editPrice(${p.id},'${p.name}',${p.price ?? 0})">改价</button> <button class="danger" style="padding:2px 8px" onclick="delPlace(${p.id})">停用</button></span></h3>
+      <div class="row"><b style="width:90px">如何进入：</b><span style="color:#0f6e56;font-size:12px" id="hint_${p.code}">（输入后自动保存）</span></div>
+      <textarea id="desc_${p.code}" data-orig="${(main?.entry_desc || '').replace(/"/g, '&quot;')}" onblur="autoSaveDesc('${p.code}')" placeholder="如：A区东门进入，直行至2号楼，乘电梯至3楼">${main?.entry_desc || ''}</textarea>
+      <div class="row" style="margin-top:10px"><b style="width:90px">地点图片：</b><div class="imgs" id="imgs_${p.code}">${imgs}</div></div>
+      <div class="row"><input type="file" id="file_${p.code}" accept="image/*" multiple style="border:none" onchange="routeDirty=true"> <button class="primary" onclick="saveRoute('${p.code}')">保存图片更改</button></div>
+    </div>`;
+  }).join('') + '<div style="color:#999;padding:0 8px">停用地点不影响历史订单展示。</div>';
+}
+async function addPlace() {
+  const v = $('newPlace').value.trim();
+  if (!v) return toast('请输入地点名称');
+  const price = parseFloat($('newPlacePrice').value) || 0;
+  const r = await api('/api/admin/places', { method: 'POST', body: { name: v, price } });
+  if (r.code === 0) { $('newPlace').value = ''; $('newPlacePrice').value = ''; renderPlaceCards(); loadPlaces(); toast('已添加，请在下方卡片中补充路线引导'); }
+  else toast(r.msg);
+}
+async function delPlace(id) {
+  if (!confirm('确认停用该地点？（历史订单不受影响）')) return;
+  await api('/api/admin/places/' + id, { method: 'DELETE' });
+  loadPlaces(); renderPlaceCards();
+}
+async function editPrice(id, name, current) {
+  const v = prompt(`「${name}」预计人均单价（元/人）：`, current || 0);
+  if (v === null) return;
+  const p = parseFloat(v);
+  if (isNaN(p) || p < 0) return toast('价格无效');
+  const r = await api(`/api/admin/places/${id}/price`, { method: 'POST', body: { price: p } });
+  if (r.code === 0) { toast('✅ 价格已更新，此后新分配按新价计算'); renderPlaceCards(); loadPlaces(); } else toast(r.msg);
+}
+function delImg(place, id) {
+  (routeDel[place] = routeDel[place] || []).push(id);
+  routeDirty = true;
+  $('imgs_' + place).querySelectorAll('.del').forEach(b => { if (b.getAttribute('onclick').includes(`'${place}',${id}`)) b.parentElement.remove(); });
+}
+// 说明文字失焦自动保存（无需找保存按钮）
+async function autoSaveDesc(place) {
+  const el = $('desc_' + place);
+  if (!el || el.value === el.dataset.orig) return;
+  const fd = new FormData();
+  fd.set('place', place);
+  fd.set('entry_desc', el.value);
+  fd.set('delete_ids', '');
+  try {
+    const r = await api('/api/admin/route-map', { method: 'POST', body: fd });
+    if (r.code === 0) {
+      el.dataset.orig = el.value;
+      const hint = $('hint_' + place);
+      if (hint) { hint.textContent = '✓ 已自动保存 ' + new Date().toLocaleTimeString(); }
+    }
+  } catch (e) { /* 静默，失焦保存失败不打断 */ }
+}
+async function saveRoute(place) {
+  const fd = new FormData();
+  fd.set('place', place);
+  fd.set('entry_desc', $('desc_' + place).value);
+  fd.set('delete_ids', (routeDel[place] || []).join(','));
+  for (const f of $('file_' + place).files) fd.append('images', f);
+  const r = await api('/api/admin/route-map', { method: 'POST', body: fd });
+  if (r.code === 0) { toast('✅ 图片更改已保存'); routeDel[place] = []; routeDirty = false; renderPlaceCards(); } else toast(r.msg);
+}
+
+// ===== 订单 =====
+async function reloadOrders() { await loadOrders(); await loadSummary(); }
+async function loadOrders() {
+  const q = new URLSearchParams();
+  if ($('fDate').value) q.set('date', $('fDate').value);
+  if ($('fStatus').value) q.set('status', $('fStatus').value);
+  const r = await api('/api/admin/orders?' + q.toString());
+  checked.clear(); updCount();
+  const MEAL = { breakfast: '早', lunch: '午', dinner: '晚' };
+  $('orderBody').innerHTML = r.data.map(o => `<tr>
+    <td><input type="checkbox" onchange="chk('${o.id}',this.checked)" ${o.status === 'rejected' ? 'disabled' : ''}></td>
+    <td>${o.meal_date}</td>
+    <td>${o.meal_type.split(',').map(m => MEAL[m] || m).join('')}</td>
+    <td>${o.name}</td><td>${o.phone}</td>    <td>${o.company}</td><td>${o.host_dept}</td>
+    <td><span title="点击修改人数" style="cursor:pointer;border-bottom:1px dashed #185fa5;color:#185fa5" onclick="editHeadcount(${o.id},${o.headcount})">${o.headcount}</span></td>
+    <td><span class="tag ${o.status}">${{pending:'待分配',assigned:'已分配',rejected:'已拒绝'}[o.status]}</span></td>
+    <td>${o.assigned_place ? placeName(o.assigned_place) : '-'}</td>
+    <td>${o.est_amount != null ? '¥' + o.est_amount : '-'}</td>
+    <td>${o.actual_amount != null ? '<b style="color:#0f6e56">¥' + o.actual_amount + '</b>' : '-'}</td>
+    <td>${{none:'-',sent:'✓已推',no_quota:'<span style="color:#854f0b">用户未授权</span>',no_template:'<span style="color:#a32d2d">未配模板</span>',failed:'<span style="color:#a32d2d">失败</span>'}[o.push_status] || '-'}</td>
+    <td>${o.visit_to || '-'}</td>
+    <td>${o.remark || '-'}</td>
+    <td>${o.status === 'assigned' ? `<button style="padding:3px 8px" onclick="setActual(${o.id},${o.actual_amount ?? ''})">维护真实</button> <button class="danger" style="padding:3px 8px" onclick="unassignOne(${o.id})">取消分配</button>` : '-'}</td>
+    <td>${o.query_code}</td>
+  </tr>`).join('') || '<tr><td colspan="17" style="text-align:center;color:#999">暂无数据</td></tr>';
+}
+function placeName(code) { const p = places.find(x => x.code === code); return p ? p.name : code; }
+function chk(id, on) { on ? checked.add(id) : checked.delete(id); updCount(); }
+function toggleAll(cb) {
+  document.querySelectorAll('#orderBody input[type=checkbox]').forEach(c => {
+    if (c.disabled) return;
+    c.checked = cb.checked;
+    const m = c.getAttribute('onchange').match(/chk\('(\d+)'/);
+    if (m) chk(m[1], cb.checked);
+  });
+}
+function updCount() { $('selCount').textContent = checked.size ? `已选 ${checked.size} 单` : ''; }
+async function editHeadcount(id, current) {
+  const v = prompt('修改该单用餐人数（分配状态下的预计金额将按新人数重算）：', current);
+  if (v === null) return;
+  const hc = parseInt(v);
+  if (!hc || hc < 1 || hc > 500) return toast('人数无效（1-500）');
+  const r = await api('/api/admin/orders/headcount', { method: 'POST', body: { id, headcount: hc } });
+  if (r.code === 0) { toast('✅ 人数已更新'); await reloadOrders(); } else toast(r.msg);
+}
+async function setActual(id, current) {
+  const v = prompt('录入真实消费金额（元）：', current || '');
+  if (v === null) return;
+  const a = parseFloat(v);
+  if (isNaN(a) || a < 0) return toast('金额无效');
+  const remark = prompt('备注（选填，如发票号/就餐确认人）：', '') || '';
+  const r = await api('/api/admin/orders/actual', { method: 'POST', body: { id, amount: a, remark } });
+  if (r.code === 0) { toast('✅ 真实金额已登记'); await reloadOrders(); } else toast(r.msg);
+}
+async function unassignOne(id) {
+  if (!confirm('确认取消该订单的分配？（恢复为待分配，可重新分配）')) return;
+  const r = await api('/api/admin/orders/unassign', { method: 'POST', body: { ids: [id] } });
+  if (r.code === 0) { toast('已取消分配'); await reloadOrders(); } else toast(r.msg);
+}
+async function batchUnassign() {
+  if (!checked.size) return toast('⚠️ 请先勾选订单左侧的复选框');
+  if (!confirm(`确认取消所选 ${checked.size} 单的分配？（恢复为待分配）`)) return;
+  const r = await api('/api/admin/orders/unassign', { method: 'POST', body: { ids: [...checked] } });
+  if (r.code === 0) { toast('已取消分配'); await reloadOrders(); } else toast(r.msg);
+}
+async function batchAssign() {
+  if (!checked.size) return toast('⚠️ 请先勾选订单左侧的复选框');
+  const r = await api('/api/admin/orders/assign', { method: 'POST', body: { ids: [...checked], place: $('assignPlace').value } });
+  if (r.code === 0) { toast(`✅ 已分配 ${checked.size} 单`); await reloadOrders(); }
+  else toast('分配失败：' + r.msg);
+}
+async function batchReject() {
+  if (!checked.size) return toast('⚠️ 请先勾选订单左侧的复选框');
+  const reason = prompt('拒绝原因（会展示给外部人员）：');
+  if (reason === null) return;
+  const r = await api('/api/admin/orders/reject', { method: 'POST', body: { ids: [...checked], reason } });
+  if (r.code === 0) { toast('已拒绝'); await reloadOrders(); } else toast(r.msg);
+}
+function exportExcel() {
+  const q = new URLSearchParams();
+  if ($('fDate').value) q.set('date', $('fDate').value);
+  if ($('fStatus').value) q.set('status', $('fStatus').value);
+  location.href = '/api/admin/orders/export?' + q.toString() + '&_t=' + token;
+}
+
+// ===== 统计 =====
+async function loadSummary() {
+  const q = new URLSearchParams();
+  if ($('fDate').value) q.set('date', $('fDate').value);
+  const r = await api('/api/admin/orders/summary?' + q.toString());
+  const { rows, pending, places: pn } = r.data;
+  if (!rows.length && !pending.length) { $('summaryBox').style.display = 'none'; return; }
+  $('summaryBox').style.display = 'block';
+  const showDate = !$('fDate').value;
+  $('sumHead').innerHTML = `${showDate ? '<th>日期</th>' : ''}<th>地点</th><th>接待部门</th><th>人数</th><th>单数</th><th>预计金额</th><th>真实金额</th>`;
+  let totalHc = 0, totalCnt = 0, totalEst = 0, totalActual = 0;
+  const body = rows.map(x => {
+    totalHc += +x.hc; totalCnt += +x.cnt; totalEst += +x.est; totalActual += +x.actual;
+    return `<tr>${showDate ? `<td>${x.meal_date}</td>` : ''}<td>${pn[x.place] || x.place || '-'}</td><td>${x.dept}</td><td><b>${x.hc}</b></td><td>${x.cnt}</td><td>¥${x.est}</td><td>${+x.actual ? '¥' + x.actual : '-'}</td></tr>`;
+  }).join('');
+  const pend = pending.map(x =>
+    `<tr class="total-row">${showDate ? `<td>${x.meal_date}</td>` : ''}<td>⏳ 待分配</td><td>—</td><td>${x.hc}</td><td>${x.cnt}</td><td>—</td><td>—</td></tr>`).join('');
+  $('sumBody').innerHTML = body + pend +
+    `<tr class="total-row"><td colspan="${showDate ? 4 : 3}">已分配合计</td><td>${totalHc}</td><td>${totalCnt}</td><td>¥${totalEst.toFixed(2)}</td><td>${totalActual ? '¥' + totalActual.toFixed(2) : '-'}</td></tr>`;
+}
+
+// ===== 区域与成员 =====
+let areaMap = {};   // id -> name
+async function loadAreas() {
+  const r = await api('/api/admin/areas');
+  const { areas, members } = r.data;
+  areaMap = Object.fromEntries(areas.map(a => [a.id, a.name]));
+  $('areaCards').innerHTML = areas.map(a => {
+    const mem = members.filter(m => m.area_id === a.id);
+    return `<div class="card">
+      <h3>📍 ${a.name} <span style="font-weight:400;color:#888;font-size:13px">（${mem.length} 名成员） <button class="danger" style="padding:2px 8px" onclick="delArea(${a.id})">停用区域</button></span></h3>
+      <table><thead><tr><th>成员姓名</th><th>钉钉手机号</th><th>操作</th></tr></thead><tbody>
+        ${mem.map(m => `<tr><td>${m.name}</td><td>${m.dingtalk_mobile}</td><td><button class="danger" style="padding:2px 8px" onclick="delMember(${m.id},${a.id})">移除</button></td></tr>`).join('') || '<tr><td colspan="3" style="color:#999">暂无成员，提交的订单将不会触发通知</td></tr>'}
+      </tbody></table>
+      <div class="row" style="margin-top:10px">
+        <input id="mName_${a.id}" placeholder="成员姓名" style="width:120px">
+        <input id="mMobile_${a.id}" placeholder="钉钉手机号" style="width:160px">
+        <button class="primary" onclick="addMember(${a.id})">添加成员</button>
+      </div>
+    </div>`;
+  }).join('') || '<div class="card" style="color:#999">暂无区域，请先在上方添加</div>';
+}
+async function addArea() {
+  const v = $('newArea').value.trim();
+  if (!v) return toast('请输入区域名称');
+  const r = await api('/api/admin/areas', { method: 'POST', body: { name: v } });
+  if (r.code === 0) { $('newArea').value = ''; loadAreas(); } else toast(r.msg);
+}
+async function delArea(id) {
+  if (!confirm('确认停用该区域？其成员将一并停用，历史订单不受影响。')) return;
+  await api('/api/admin/areas/' + id, { method: 'DELETE' });
+  loadAreas();
+}
+async function addMember(areaId) {
+  const r = await api(`/api/admin/areas/${areaId}/members`, { method: 'POST', body: { name: $('mName_' + areaId).value.trim(), dingtalk_mobile: $('mMobile_' + areaId).value.trim() } });
+  if (r.code === 0) loadAreas(); else toast(r.msg);
+}
+async function delMember(mid, areaId) {
+  await api('/api/admin/areas/members/' + mid, { method: 'DELETE' });
+  loadAreas();
+}
+
+// ===== 部门 =====
+async function loadDepts() {
+  const r = await api('/api/admin/dept');
+  depts = r.data;
+  $('deptList').innerHTML = depts.map((d, i) =>
+    `<span class="tag assigned" style="padding:4px 10px">${d} <button style="background:transparent;color:#a32d2d;border:none;font-size:13px;padding:0" onclick="delDept(${i})">×</button></span>`).join('');
+}
+async function addDept() {
+  const v = $('newDept').value.trim();
+  if (!v) return;
+  depts.push(v);
+  const r = await api('/api/admin/dept', { method: 'POST', body: { list: depts } });
+  if (r.code === 0) { $('newDept').value = ''; loadDepts(); }
+}
+async function delDept(i) { depts.splice(i, 1); await api('/api/admin/dept', { method: 'POST', body: { list: depts } }); loadDepts(); }
+
+async function init() {
+  await loadPlaces();
+  await loadDash();
+}
+if (token) { $('loginBox').style.display = 'none'; $('main').style.display = 'block'; init(); }
+</script>
+</body>
+</html>

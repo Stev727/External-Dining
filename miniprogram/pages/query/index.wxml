@@ -1,0 +1,35 @@
+<view class="query-bar">
+  <input placeholder="凭证码" value="{{code}}" data-field="code" bindinput="onInput" />
+  <button style="flex-shrink:0" class="btn-primary" bindtap="query">查询</button>
+</view>
+<view class="query-bar" style="padding-top:0">
+  <input type="number" placeholder="或 手机号" value="{{phone}}" data-field="phone" bindinput="onInput" />
+  <picker mode="date" value="{{mealDate}}" bindchange="onDateChange" style="flex:1">
+    <view style="background:#fff;border-radius:12rpx;padding:16rpx 24rpx">{{mealDate || '选择用餐日期'}}</view>
+  </picker>
+</view>
+
+<view wx:for="{{orders}}" wx:key="id" class="order-card">
+  <view class="order-line"><text class="k">状态</text>
+    <text class="status-tag st-{{item.status}}">{{item.status === 'pending' ? '⏳ 待分配' : item.status === 'assigned' ? '✅ 已分配' : '❌ 已拒绝'}}</text>
+  </view>
+  <view class="order-line"><text class="k">用餐日期</text><text>{{item.meal_date}}</text></view>
+  <view class="order-line"><text class="k">餐别</text><text>{{item.mealTypeStr}}</text></view>
+  <view class="order-line"><text class="k">姓名</text><text>{{item.name}}（{{item.phone}}）</text></view>
+  <view class="order-line"><text class="k">单位</text><text>{{item.company}}</text></view>
+  <view class="order-line"><text class="k">接待部门</text><text>{{item.host_dept}}</text></view>
+  <view class="order-line"><text class="k">被访问人</text><text>{{item.visit_to || '-'}}</text></view>
+  <view class="order-line"><text class="k">人数</text><text>{{item.headcount}}</text></view>
+  <view class="order-line"><text class="k">地点</text><text>{{item.status === 'assigned' ? item.placeStr : item.status === 'rejected' ? ('未能安排' + (item.reject_reason || '')) : '待分配'}}</text></view>
+
+  <block wx:if="{{item.status === 'assigned'}}">
+    <view class="route-title">🧭 如何进入</view>
+    <view style="font-size:27rpx;color:#555">{{item.entryDesc || '（暂无说明，可咨询接待部门）'}}</view>
+    <view wx:if="{{item.imgs.length}}" class="route-title">📷 地点图片</view>
+    <image wx:for="{{item.imgs}}" wx:for-item="img" wx:key="*this" class="route-img" src="{{img}}" mode="aspectFill" data-urls="{{item.imgs}}" data-current="{{img}}" bindtap="previewImg"></image>
+  </block>
+  <view wx:if="{{item.remark}}" class="order-line"><text class="k">备注</text><text>{{item.remark}}</text></view>
+  <view class="order-line"><text class="k">凭证码</text><text style="color:#185fa5;font-weight:500">{{item.query_code}}</text></view>
+</view>
+
+<view wx:if="{{loaded && !orders.length}}" style="text-align:center;color:#999;padding:80rpx 0">未找到订餐记录</view>
