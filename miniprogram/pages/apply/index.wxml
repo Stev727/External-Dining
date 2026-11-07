@@ -27,7 +27,7 @@
       <input placeholder="如：XX公司 研发部" value="{{form.company}}" data-field="company" bindinput="onInput" />
     </view>
     <view class="form-item">
-      <view class="form-label"><text class="req">*</text>所属区域</view>
+      <view class="form-label"><text class="req">*</text>到访区域</view>
       <picker range="{{areas}}" range-key="name" value="{{areaIndex}}" bindchange="onAreaChange">
         <view>{{areaIndex >= 0 ? areas[areaIndex].name : '请选择要访问的区域'}}</view>
       </picker>
@@ -37,9 +37,9 @@
       <input placeholder="对接人姓名" value="{{form.visit_to}}" data-field="visit_to" bindinput="onInput" />
     </view>
     <view class="form-item">
-      <view class="form-label"><text class="req">*</text>接待部门</view>
+      <view class="form-label"><text class="req">*</text>被访部门</view>
       <picker range="{{depts}}" value="{{deptIndex}}" bindchange="onDeptChange">
-        <view>{{deptIndex >= 0 ? depts[deptIndex] : '请选择中坚接待部门'}}</view>
+        <view>{{deptIndex >= 0 ? depts[deptIndex] : '请选择被访部门'}}</view>
       </picker>
     </view>
     <view class="form-item">
@@ -54,7 +54,7 @@
   <view class="btn-area">
     <button class="btn-primary" disabled="{{submitting}}" bindtap="submit">{{submitting ? '提交中...' : '提交订餐'}}</button>
   </view>
-  <view class="tip">提交后由接待部门为您分配用餐地点，分配结果可在「订餐查询」查看。</view>
+  <view class="tip">提交后由被访部门为您分配用餐地点，分配结果可在「订餐查询」查看。</view>
 </view>
 
 <view wx:else class="success-box">

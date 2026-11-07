@@ -299,7 +299,7 @@ router.get('/orders/export', async (req, res) => {
     { header: '姓名', key: 'name', width: 10 },
     { header: '电话', key: 'phone', width: 14 },
     { header: '工作单位/部门', key: 'company', width: 24 },
-    { header: '接待部门', key: 'host_dept', width: 16 },
+    { header: '被访部门', key: 'host_dept', width: 16 },
     { header: '人数', key: 'headcount', width: 8 },
     { header: '状态', key: 'status', width: 10 },
     { header: '分配地点', key: 'assigned_place', width: 12 },

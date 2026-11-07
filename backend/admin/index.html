@@ -73,7 +73,7 @@ textarea { width: 100%; min-height: 60px; padding: 9px 12px; border: 1px solid #
     <div class="tab" data-tab="orders" onclick="switchTab('orders')">订餐记录</div>
     <div class="tab" data-tab="place" onclick="switchTab('place')">地点与路线</div>
     <div class="tab" data-tab="area" onclick="switchTab('area')">区域与成员</div>
-    <div class="tab" data-tab="dept" onclick="switchTab('dept')">接待部门</div>
+    <div class="tab" data-tab="dept" onclick="switchTab('dept')">被访部门</div>
   </div>
 
   <!-- 看板 -->
@@ -81,9 +81,9 @@ textarea { width: 100%; min-height: 60px; padding: 9px 12px; border: 1px solid #
     <div class="dash-grid" id="dashCards"></div>
     <div class="two-col">
       <div class="card"><h3>今日 · 按地点</h3><table><thead><tr id="dpHead"></tr></thead><tbody id="dpBody"></tbody></table></div>
-      <div class="card"><h3>今日 · 按接待部门</h3><table><thead><tr><th>部门</th><th>单数</th><th>人数</th></tr></thead><tbody id="ddBody"></tbody></table></div>
+      <div class="card"><h3>今日 · 按被访部门</h3><table><thead><tr><th>部门</th><th>单数</th><th>人数</th></tr></thead><tbody id="ddBody"></tbody></table></div>
     </div>
-    <div class="card"><h3>最新提交</h3><table><thead><tr><th>时间</th><th>姓名</th><th>单位/部门</th><th>接待部门</th><th>用餐日期</th><th>餐别</th><th>人数</th><th>状态</th></tr></thead><tbody id="drBody"></tbody></table></div>
+    <div class="card"><h3>最新提交</h3><table><thead><tr><th>时间</th><th>姓名</th><th>单位/部门</th><th>被访部门</th><th>用餐日期</th><th>餐别</th><th>人数</th><th>状态</th></tr></thead><tbody id="drBody"></tbody></table></div>
   </div>
 
   <!-- 订餐记录 + 统计 -->
@@ -111,7 +111,7 @@ textarea { width: 100%; min-height: 60px; padding: 9px 12px; border: 1px solid #
       <thead><tr>
         <th><input type="checkbox" onchange="toggleAll(this)"></th>
         <th>日期</th><th>餐别</th><th>姓名</th><th>电话</th><th>单位/部门</th>
-        <th>接待部门</th><th>人数</th><th>状态</th><th>地点</th><th>预计金额</th><th>真实金额</th><th>推送</th><th>被访问人</th><th>备注</th><th>操作</th><th>凭证码</th>
+        <th>被访部门</th><th>人数</th><th>状态</th><th>地点</th><th>预计金额</th><th>真实金额</th><th>推送</th><th>被访问人</th><th>备注</th><th>操作</th><th>凭证码</th>
       </tr></thead>
       <tbody id="orderBody"></tbody>
     </table>
@@ -144,10 +144,10 @@ textarea { width: 100%; min-height: 60px; padding: 9px 12px; border: 1px solid #
     <div id="areaCards"></div>
   </div>
 
-  <!-- 接待部门 -->
+  <!-- 被访部门 -->
   <div id="tab-dept" style="display:none">
     <div class="card">
-      <h3>接待部门选项（小程序下拉）</h3>
+      <h3>被访部门选项（小程序下拉）</h3>
       <div class="row"><input id="newDept" placeholder="部门名称" style="width:200px"><button class="primary" onclick="addDept()">添加</button></div>
       <div id="deptList" class="row"></div>
     </div>
@@ -394,7 +394,7 @@ async function loadSummary() {
   if (!rows.length && !pending.length) { $('summaryBox').style.display = 'none'; return; }
   $('summaryBox').style.display = 'block';
   const showDate = !$('fDate').value;
-  $('sumHead').innerHTML = `${showDate ? '<th>日期</th>' : ''}<th>地点</th><th>接待部门</th><th>人数</th><th>单数</th><th>预计金额</th><th>真实金额</th>`;
+  $('sumHead').innerHTML = `${showDate ? '<th>日期</th>' : ''}<th>地点</th><th>被访部门</th><th>人数</th><th>单数</th><th>预计金额</th><th>真实金额</th>`;
   let totalHc = 0, totalCnt = 0, totalEst = 0, totalActual = 0;
   const body = rows.map(x => {
     totalHc += +x.hc; totalCnt += +x.cnt; totalEst += +x.est; totalActual += +x.actual;

@@ -91,9 +91,9 @@ Page({
     if (!f.phone.trim()) return '请填写电话';
     if (!/^1[3-9]\d{9}$/.test(f.phone.trim())) return '手机号格式不正确';
     if (!f.company.trim()) return '请填写工作单位/部门';
-    if (this.data.areaIndex < 0) return '请选择所属区域';
+    if (this.data.areaIndex < 0) return '请选择到访区域';
     if (!f.visit_to.trim()) return '请填写被访问人';
-    if (this.data.deptIndex < 0) return '请选择接待部门';
+    if (this.data.deptIndex < 0) return '请选择被访部门';
     if (!this.data.meals.some(m => m.on)) return '请选择用餐餐别';
     return null;
   },

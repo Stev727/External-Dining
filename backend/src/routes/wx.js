@@ -76,7 +76,7 @@ router.post('/order', auth, async (req, res) => {
     if (!meal_date || !meal_type || !name || !phone || !company || !host_dept) {
       return res.json({ code: 400, msg: '请填写完整必填项' });
     }
-    if (!area_id) return res.json({ code: 400, msg: '请选择所属区域' });
+    if (!area_id) return res.json({ code: 400, msg: '请选择到访区域' });
     if (!visit_to || !visit_to.trim()) return res.json({ code: 400, msg: '请填写被访问人' });
     const [areaChk] = await pool.query('SELECT id FROM meal_area WHERE id=? AND enabled=1', [area_id]);
     if (!areaChk.length) return res.json({ code: 400, msg: '所选区域不存在' });
