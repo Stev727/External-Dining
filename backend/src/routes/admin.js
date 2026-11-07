@@ -136,18 +136,22 @@ router.delete('/users/:id', auth, requireAdmin, async (req, res) => {
   res.json({ code: 0 });
 });
 
-// 订单列表
+// 订单列表（服务端分页）
 router.get('/orders', auth, async (req, res) => {
   const { date, status, place } = req.query;
   const where = [], params = [];
   if (date) { where.push('meal_date=?'); params.push(date); }
   if (status) { where.push('status=?'); params.push(status); }
   if (place) { where.push('assigned_place=?'); params.push(place); }
+  const cond = where.length ? 'WHERE ' + where.join(' AND ') : '';
+  const ps = Math.min(Math.max(parseInt(req.query.pageSize) || 20, 1), 500);
+  const p = Math.max(parseInt(req.query.page) || 1, 1);
+  const [cnt] = await pool.query(`SELECT COUNT(*) c FROM meal_order ${cond}`, params);
   const [rows] = await pool.query(
-    `SELECT * FROM meal_order ${where.length ? 'WHERE ' + where.join(' AND ') : ''} ORDER BY meal_date DESC, id DESC LIMIT 500`,
-    params
+    `SELECT * FROM meal_order ${cond} ORDER BY meal_date DESC, id DESC LIMIT ? OFFSET ?`,
+    [...params, ps, (p - 1) * ps]
   );
-  res.json({ code: 0, data: rows });
+  res.json({ code: 0, data: { rows, total: cnt[0].c, page: p, pageSize: ps } });
 });
 
 // 分配（批量，支持改派；预计金额=人数x地点单价快照）

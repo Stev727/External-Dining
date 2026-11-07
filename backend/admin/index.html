@@ -24,6 +24,10 @@ body { font: 14px/1.6 -apple-system, "PingFang SC", "Microsoft YaHei", sans-seri
 .dbar { flex: 1; background: #F0F3F8; border-radius: 6px; height: 18px; overflow: hidden; }
 .dbar div { height: 100%; background: #639922; border-radius: 6px; }
 .dnum { width: 280px; font-size: 12px; color: #666; white-space: nowrap; }
+.pager { display: flex; gap: 10px; align-items: center; justify-content: flex-end; padding: 12px 4px 2px; font-size: 13px; color: #666; flex-wrap: wrap; }
+.pager button { padding: 4px 14px; }
+.pager button:disabled { opacity: .45; cursor: not-allowed; }
+.pager b { color: #185fa5; }
 input, select { width: 100%; padding: 9px 12px; border: 1px solid #d9dce3; border-radius: 8px; font-size: 14px; margin-bottom: 12px; }
 button { padding: 8px 16px; border: 1px solid #d9dce3; border-radius: 8px; background: #fff; cursor: pointer; font-size: 13px; }
 button.primary { background: #185fa5; color: #fff; border-color: #185fa5; }
@@ -148,6 +152,7 @@ textarea { width: 100%; min-height: 60px; padding: 9px 12px; border: 1px solid #
       </tr></thead>
       <tbody id="orderBody"></tbody>
     </table>
+    <div class="pager" id="pager"></div>
   </div>
 
   <!-- 地点与路线（合并） -->
@@ -296,7 +301,7 @@ async function delUser(id, name) {
 async function focusOrder(id) {
   switchTab('orders');
   $('fStatus').value = ''; $('fDate').value = '';
-  await loadOrders();
+  await loadOrders({ big: true });
   const row = document.querySelector(`#orderBody tr[data-id="${id}"]`);
   if (row) {
     row.scrollIntoView({ behavior: 'smooth', block: 'center' });
@@ -429,14 +434,21 @@ async function saveRoute(place) {
 
 // ===== 订单 =====
 async function reloadOrders() { await loadOrders(); await loadSummary(); }
-async function loadOrders() {
+let ordPage = 1;
+function ordSize() { const s = document.getElementById('fSize'); return +(s?.value) || 20; }
+async function loadOrders(opts = {}) {
+  if (!opts.keepPage) ordPage = 1;
+  const size = opts.big ? 500 : ordSize();
+  const page = opts.big ? 1 : ordPage;
   const q = new URLSearchParams();
   if ($('fDate').value) q.set('date', $('fDate').value);
   if ($('fStatus').value) q.set('status', $('fStatus').value);
+  q.set('page', page); q.set('pageSize', size);
   const r = await api('/api/admin/orders?' + q.toString());
   checked.clear(); updCount();
+  const { rows, total } = r.data;
   const MEAL = { breakfast: '早', lunch: '午', dinner: '晚' };
-  $('orderBody').innerHTML = r.data.map(o => `<tr data-id="${o.id}">
+  $('orderBody').innerHTML = rows.map(o => `<tr data-id="${o.id}">
     <td><input type="checkbox" onchange="chk('${o.id}',this.checked)" ${o.status === 'rejected' ? 'disabled' : ''}></td>
     <td>${o.meal_date}</td>
     <td>${o.meal_type.split(',').map(m => MEAL[m] || m).join('')}</td>
@@ -452,7 +464,22 @@ async function loadOrders() {
     <td>${o.status === 'assigned' ? `<button style="padding:3px 8px" onclick="setActual(${o.id},${o.actual_amount ?? ''})">维护真实</button> <button class="danger" style="padding:3px 8px" onclick="unassignOne(${o.id})">取消分配</button>` : '-'}</td>
     <td>${o.query_code}</td>
   </tr>`).join('') || '<tr><td colspan="17" style="text-align:center;color:#999">暂无数据</td></tr>';
+  renderPager(total, size, page, opts.big);
 }
+function renderPager(total, size, page, big) {
+  const el = $('pager');
+  if (big) { el.style.display = 'flex'; el.innerHTML = `<span>定位模式：已加载全部 ${total} 条</span>`; return; }
+  const pages = Math.max(1, Math.ceil(total / size));
+  el.style.display = 'flex';
+  const opts = [20, 50, 100, 200].map(n => `<option value="${n}" ${n === size ? 'selected' : ''}>${n}</option>`).join('');
+  el.innerHTML = `
+    <span>共 <b>${total}</b> 条</span>
+    <span>每页 <select id="fSize" onchange="ordPage=1;loadOrders({keepPage:false})">${opts}</select> 条</span>
+    <button onclick="gotoPage(${page - 1})" ${page <= 1 ? 'disabled' : ''}>上一页</button>
+    <span>第 <b>${page}</b> / ${pages} 页</span>
+    <button onclick="gotoPage(${page + 1})" ${page >= pages ? 'disabled' : ''}>下一页</button>`;
+}
+function gotoPage(p) { ordPage = Math.max(1, p); loadOrders({ keepPage: true }); }
 function placeName(code) { const p = places.find(x => x.code === code); return p ? p.name : code; }
 function chk(id, on) { on ? checked.add(id) : checked.delete(id); updCount(); }
 function toggleAll(cb) {
