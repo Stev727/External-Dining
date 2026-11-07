@@ -2,6 +2,7 @@ const express = require('express');
 const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
+const crypto = require('crypto');
 const jwt = require('jsonwebtoken');
 const ExcelJS = require('exceljs');
 const { pool, getConfig, invalidateConfigCache, getPlaces } = require('../db');
@@ -26,20 +27,113 @@ const upload = multer({
 function auth(req, res, next) {
   const token = (req.headers.authorization || '').replace('Bearer ', '');
   try {
-    jwt.verify(token, JWT_SECRET);
+    req.user = jwt.verify(token, JWT_SECRET);
     next();
   } catch (e) {
     res.status(401).json({ code: 401, msg: '登录失效' });
   }
 }
 
-// 登录
+// 仅管理员可访问（用户管理/地点单价/区域成员/被访部门等配置类接口）
+function requireAdmin(req, res, next) {
+  if (req.user && req.user.role === 'admin') return next();
+  res.json({ code: 403, msg: '需要管理员权限' });
+}
+
+// ===== 用户账号体系 =====
+function hashPwd(p) {
+  const salt = crypto.randomBytes(8).toString('hex');
+  return salt + ':' + crypto.scryptSync(String(p), salt, 32).toString('hex');
+}
+function verifyPwd(p, stored) {
+  try {
+    const [salt, h] = String(stored).split(':');
+    return crypto.timingSafeEqual(Buffer.from(h, 'hex'), crypto.scryptSync(String(p), salt, 32));
+  } catch (e) { return false; }
+}
+
+// 首次启动自动建用户表，并种子默认管理员（用户名 admin，密码取 ADMIN_PASSWORD）
+(async () => {
+  try {
+    await pool.query(`CREATE TABLE IF NOT EXISTS meal_user (
+      id BIGINT AUTO_INCREMENT PRIMARY KEY,
+      username VARCHAR(50) NOT NULL UNIQUE,
+      password_hash VARCHAR(120) NOT NULL,
+      role VARCHAR(20) NOT NULL DEFAULT 'operator',
+      mobile VARCHAR(20) DEFAULT '',
+      enabled TINYINT(1) DEFAULT 1,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4`);
+    const [u] = await pool.query('SELECT COUNT(*) c FROM meal_user');
+    if (!u[0].c) {
+      const initPwd = process.env.ADMIN_PASSWORD || 'meal@2026';
+      await pool.query('INSERT INTO meal_user (username, password_hash, role, mobile) VALUES (?,?,?,?)',
+        ['admin', hashPwd(initPwd), 'admin', '']);
+      console.log('[admin] 已创建默认管理员账号 admin（密码取 ADMIN_PASSWORD）');
+    }
+  } catch (e) {
+    console.error('[admin] 用户表初始化失败:', e.message);
+  }
+})();
+
+// 登录（账号+密码；兼容旧版仅口令，映射到默认 admin 账号）
 router.post('/login', async (req, res) => {
-  const pwd = await getConfig('admin_password');
-  if (!pwd) return res.json({ code: 500, msg: '管理口令未配置（请设置环境变量 ADMIN_PASSWORD 或配置表）' });
-  if (req.body.password !== pwd) return res.json({ code: 401, msg: '口令错误' });
-  const token = jwt.sign({ role: 'admin' }, JWT_SECRET, { expiresIn: '12h' });
-  res.json({ code: 0, data: { token } });
+  const { username, password } = req.body;
+  const issue = (u) => {
+    const token = jwt.sign({ uid: u.id, role: u.role, name: u.username }, JWT_SECRET, { expiresIn: '12h' });
+    res.json({ code: 0, data: { token, role: u.role, name: u.username } });
+  };
+  if (!username) {
+    const pwd = await getConfig('admin_password');
+    if (!pwd || password !== pwd) return res.json({ code: 401, msg: '口令错误' });
+    const [rows] = await pool.query("SELECT * FROM meal_user WHERE username='admin' AND enabled=1");
+    if (rows.length) return issue(rows[0]);
+    return res.json({ code: 0, data: { token: jwt.sign({ role: 'admin', name: 'admin' }, JWT_SECRET, { expiresIn: '12h' }), role: 'admin', name: 'admin' } });
+  }
+  const [rows] = await pool.query('SELECT * FROM meal_user WHERE username=? AND enabled=1', [username]);
+  if (!rows.length || !verifyPwd(password || '', rows[0].password_hash)) {
+    return res.json({ code: 401, msg: '账号或密码错误' });
+  }
+  issue(rows[0]);
+});
+
+// ===== 用户管理（仅管理员） =====
+router.get('/users', auth, requireAdmin, async (req, res) => {
+  const [rows] = await pool.query('SELECT id, username, role, mobile, enabled, created_at FROM meal_user ORDER BY id');
+  res.json({ code: 0, data: rows });
+});
+router.post('/users', auth, requireAdmin, async (req, res) => {
+  const { username, password, role, mobile } = req.body;
+  if (!/^[a-zA-Z0-9_]{3,20}$/.test(username || '')) return res.json({ code: 400, msg: '用户名需 3-20 位字母数字下划线' });
+  if (!password || String(password).length < 6) return res.json({ code: 400, msg: '密码至少 6 位' });
+  try {
+    await pool.query('INSERT INTO meal_user (username, password_hash, role, mobile) VALUES (?,?,?,?)',
+      [username, hashPwd(password), role === 'admin' ? 'admin' : 'operator', mobile || '']);
+    res.json({ code: 0 });
+  } catch (e) {
+    res.json({ code: 400, msg: e.code === 'ER_DUP_ENTRY' ? '用户名已存在' : e.message });
+  }
+});
+router.post('/users/:id/reset', auth, requireAdmin, async (req, res) => {
+  const { password } = req.body;
+  if (!password || String(password).length < 6) return res.json({ code: 400, msg: '新密码至少 6 位' });
+  await pool.query('UPDATE meal_user SET password_hash=? WHERE id=?', [hashPwd(password), req.params.id]);
+  res.json({ code: 0 });
+});
+router.post('/users/:id/toggle', auth, requireAdmin, async (req, res) => {
+  await pool.query('UPDATE meal_user SET enabled = NOT enabled WHERE id=?', [req.params.id]);
+  res.json({ code: 0 });
+});
+router.delete('/users/:id', auth, requireAdmin, async (req, res) => {
+  const [rows] = await pool.query('SELECT username, role FROM meal_user WHERE id=?', [req.params.id]);
+  if (!rows.length) return res.json({ code: 404, msg: '用户不存在' });
+  if (rows[0].username === req.user.name) return res.json({ code: 400, msg: '不能删除当前登录账号' });
+  if (rows[0].role === 'admin') {
+    const [a] = await pool.query("SELECT COUNT(*) c FROM meal_user WHERE role='admin' AND enabled=1");
+    if (a[0].c <= 1) return res.json({ code: 400, msg: '至少保留一个启用的管理员' });
+  }
+  await pool.query('DELETE FROM meal_user WHERE id=?', [req.params.id]);
+  res.json({ code: 0 });
 });
 
 // 订单列表
@@ -160,7 +254,7 @@ router.get('/places', auth, async (req, res) => {
   const [rows] = await pool.query('SELECT * FROM meal_place ORDER BY sort, id');
   res.json({ code: 0, data: rows });
 });
-router.post('/places', auth, async (req, res) => {
+router.post('/places', auth, requireAdmin, async (req, res) => {
   const { name, price } = req.body;
   if (!name?.trim()) return res.json({ code: 400, msg: '地点名称必填' });
   const code = 'p' + Date.now().toString(36);
@@ -168,17 +262,17 @@ router.post('/places', auth, async (req, res) => {
   await pool.query('INSERT INTO meal_place (code, name, sort, price) VALUES (?,?,?,?)', [code, name.trim(), maxSort[0].s, +price || 0]);
   res.json({ code: 0 });
 });
-router.post('/places/:id/price', auth, async (req, res) => {
+router.post('/places/:id/price', auth, requireAdmin, async (req, res) => {
   const { price } = req.body;
   if (isNaN(+price) || +price < 0) return res.json({ code: 400, msg: '价格无效' });
   await pool.query('UPDATE meal_place SET price=? WHERE id=?', [+price, req.params.id]);
   res.json({ code: 0 });
 });
-router.delete('/places/:id', auth, async (req, res) => {
+router.delete('/places/:id', auth, requireAdmin, async (req, res) => {
   await pool.query('UPDATE meal_place SET enabled=0 WHERE id=?', [req.params.id]);
   res.json({ code: 0 });
 });
-router.post('/places/:id/rename', auth, async (req, res) => {
+router.post('/places/:id/rename', auth, requireAdmin, async (req, res) => {
   const { name } = req.body;
   if (!name?.trim()) return res.json({ code: 400, msg: '名称必填' });
   await pool.query('UPDATE meal_place SET name=? WHERE id=?', [name.trim(), req.params.id]);
@@ -211,19 +305,19 @@ router.get('/areas', auth, async (req, res) => {
   const [members] = await pool.query('SELECT * FROM meal_area_member WHERE enabled=1 ORDER BY id');
   res.json({ code: 0, data: { areas, members } });
 });
-router.post('/areas', auth, async (req, res) => {
+router.post('/areas', auth, requireAdmin, async (req, res) => {
   const { name } = req.body;
   if (!name?.trim()) return res.json({ code: 400, msg: '区域名称必填' });
   const [maxSort] = await pool.query('SELECT IFNULL(MAX(sort),0)+1 s FROM meal_area');
   await pool.query('INSERT INTO meal_area (name, sort) VALUES (?,?)', [name.trim(), maxSort[0].s]);
   res.json({ code: 0 });
 });
-router.delete('/areas/:id', auth, async (req, res) => {
+router.delete('/areas/:id', auth, requireAdmin, async (req, res) => {
   await pool.query('UPDATE meal_area SET enabled=0 WHERE id=?', [req.params.id]);
   await pool.query('UPDATE meal_area_member SET enabled=0 WHERE area_id=?', [req.params.id]);
   res.json({ code: 0 });
 });
-router.post('/areas/:id/members', auth, async (req, res) => {
+router.post('/areas/:id/members', auth, requireAdmin, async (req, res) => {
   const { name, dingtalk_mobile } = req.body;
   if (!name || !/^1[3-9]\d{9}$/.test(dingtalk_mobile || '')) return res.json({ code: 400, msg: '姓名和钉钉手机号必填' });
   const [area] = await pool.query('SELECT id FROM meal_area WHERE id=? AND enabled=1', [req.params.id]);
@@ -231,7 +325,7 @@ router.post('/areas/:id/members', auth, async (req, res) => {
   await pool.query('INSERT INTO meal_area_member (area_id, name, dingtalk_mobile) VALUES (?,?,?)', [req.params.id, name, dingtalk_mobile]);
   res.json({ code: 0 });
 });
-router.delete('/areas/members/:mid', auth, async (req, res) => {
+router.delete('/areas/members/:mid', auth, requireAdmin, async (req, res) => {
   await pool.query('UPDATE meal_area_member SET enabled=0 WHERE id=?', [req.params.mid]);
   res.json({ code: 0 });
 });
@@ -241,7 +335,7 @@ router.get('/dept', auth, async (req, res) => {
   const depts = await getConfig('host_depts');
   res.json({ code: 0, data: JSON.parse(depts || '[]') });
 });
-router.post('/dept', auth, async (req, res) => {
+router.post('/dept', auth, requireAdmin, async (req, res) => {
   const { list } = req.body;
   if (!Array.isArray(list)) return res.json({ code: 400, msg: '参数错误' });
   await pool.query('UPDATE meal_config SET cfg_value=? WHERE cfg_key=?', [JSON.stringify(list), 'host_depts']);
@@ -254,7 +348,7 @@ router.get('/route-map', auth, async (req, res) => {
   const [rows] = await pool.query('SELECT * FROM meal_route_map WHERE enabled=1 ORDER BY place, sort');
   res.json({ code: 0, data: rows });
 });
-router.post('/route-map', auth, upload.array('images', 9), async (req, res) => {
+router.post('/route-map', auth, requireAdmin, upload.array('images', 9), async (req, res) => {
   try {
     const { place, entry_desc } = req.body;
     const places = await getPlaces();

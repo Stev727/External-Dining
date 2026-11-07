@@ -59,7 +59,8 @@ textarea { width: 100%; min-height: 60px; padding: 9px 12px; border: 1px solid #
 
 <div class="login-box" id="loginBox">
   <h2>订餐管理端</h2>
-  <input type="password" id="pwd" placeholder="管理口令" onkeydown="if(event.key==='Enter')login()">
+  <input type="text" id="uname" placeholder="账号" onkeydown="if(event.key==='Enter')login()">
+  <input type="password" id="pwd" placeholder="密码" onkeydown="if(event.key==='Enter')login()">
   <button class="primary" style="width:100%" onclick="login()">登 录</button>
 </div>
 
@@ -71,9 +72,10 @@ textarea { width: 100%; min-height: 60px; padding: 9px 12px; border: 1px solid #
   <div class="tabs">
     <div class="tab active" data-tab="dash" onclick="switchTab('dash')">看板</div>
     <div class="tab" data-tab="orders" onclick="switchTab('orders')">订餐记录</div>
-    <div class="tab" data-tab="place" onclick="switchTab('place')">地点与路线</div>
-    <div class="tab" data-tab="area" onclick="switchTab('area')">区域与成员</div>
-    <div class="tab" data-tab="dept" onclick="switchTab('dept')">被访部门</div>
+    <div class="tab" data-tab="place" onclick="switchTab('place')" data-admin="1">地点与路线</div>
+    <div class="tab" data-tab="area" onclick="switchTab('area')" data-admin="1">区域与成员</div>
+    <div class="tab" data-tab="dept" onclick="switchTab('dept')" data-admin="1">被访部门</div>
+    <div class="tab" data-tab="users" onclick="switchTab('users')" data-admin="1">用户管理</div>
   </div>
 
   <!-- 看板 -->
@@ -152,6 +154,25 @@ textarea { width: 100%; min-height: 60px; padding: 9px 12px; border: 1px solid #
       <div id="deptList" class="row"></div>
     </div>
   </div>
+
+  <!-- 用户管理 -->
+  <div id="tab-users" style="display:none">
+    <div class="card">
+      <h3>新增账号</h3>
+      <div class="row">
+        <input id="nuName" placeholder="用户名（3-20位字母数字）" style="width:200px">
+        <input id="nuPwd" placeholder="密码（至少6位）" style="width:150px" type="password">
+        <select id="nuRole" style="width:130px"><option value="operator">操作员</option><option value="admin">管理员</option></select>
+        <input id="nuMobile" placeholder="手机号（选填）" style="width:140px">
+        <button class="primary" onclick="addUser()">创建账号</button>
+      </div>
+      <span style="color:#999;font-size:12px">管理员：可维护地点/区域/部门/账号；操作员：仅分配、改人数、维护真实金额、看板与导出</span>
+    </div>
+    <div class="card">
+      <h3>账号列表</h3>
+      <table><thead><tr><th>用户名</th><th>角色</th><th>手机号</th><th>状态</th><th>创建时间</th><th>操作</th></tr></thead><tbody id="userBody"></tbody></table>
+    </div>
+  </div>
 </div>
 
 <script>
@@ -175,13 +196,22 @@ async function api(path, opt = {}) {
 }
 
 async function login() {
-  const r = await fetch('/api/admin/login', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ password: $('pwd').value }) }).then(r => r.json());
+  const r = await fetch('/api/admin/login', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ username: $('uname').value.trim(), password: $('pwd').value }) }).then(r => r.json());
   if (r.code !== 0) return toast(r.msg || '登录失败');
   token = r.data.token; sessionStorage.setItem('meal_token', token);
+  sessionStorage.setItem('meal_role', r.data.role || 'operator');
+  sessionStorage.setItem('meal_name', r.data.name || '');
   $('loginBox').style.display = 'none'; $('main').style.display = 'block';
-  init();
+  applyRole(); init();
 }
-function logout() { token = ''; sessionStorage.removeItem('meal_token'); location.reload(); }
+function logout() { token = ''; sessionStorage.clear(); location.reload(); }
+function myRole() { return sessionStorage.getItem('meal_role') || 'operator'; }
+
+// 角色可见性：非管理员隐藏配置类标签
+function applyRole() {
+  const admin = myRole() === 'admin';
+  document.querySelectorAll('.tab[data-admin]').forEach(e => e.style.display = admin ? '' : 'none');
+}
 
 function switchTab(t) {
   if (routeDirty && t !== 'place') {
@@ -189,12 +219,61 @@ function switchTab(t) {
     routeDirty = false;
   }
   document.querySelectorAll('.tab').forEach(e => e.classList.toggle('active', e.dataset.tab === t));
-  ['dash', 'orders', 'place', 'area', 'dept'].forEach(k => $('tab-' + k).style.display = k === t ? '' : 'none');
+  ['dash', 'orders', 'place', 'area', 'dept', 'users'].forEach(k => { const el = $('tab-' + k); if (el) el.style.display = k === t ? '' : 'none'; });
   if (t === 'dash') loadDash();
   if (t === 'orders') { loadOrders(); loadSummary(); }
   if (t === 'place') renderPlaceCards();
   if (t === 'area') loadAreas();
   if (t === 'dept') loadDepts();
+  if (t === 'users') loadUsers();
+}
+
+// ===== 用户管理 =====
+async function loadUsers() {
+  const r = await api('/api/admin/users');
+  if (r.code !== 0) return toast(r.msg);
+  $('userBody').innerHTML = r.data.map(u => {
+    const ops = [
+      `<button style="padding:2px 8px" onclick="resetPwd(${u.id},'${u.username}')">重置密码</button>`,
+      u.username === 'admin' ? '' : `<button style="padding:2px 8px" onclick="toggleUser(${u.id})">${u.enabled ? '停用' : '启用'}</button>`,
+      u.username === 'admin' ? '' : `<button class="danger" style="padding:2px 8px" onclick="delUser(${u.id},'${u.username}')">删除</button>`
+    ].filter(Boolean).join(' ');
+    return `<tr><td><b>${u.username}</b></td><td>${u.role === 'admin' ? '管理员' : '操作员'}</td><td>${u.mobile || '-'}</td>
+      <td>${u.enabled ? '<span class="tag assigned">启用</span>' : '<span class="tag rejected">停用</span>'}</td>
+      <td>${(u.created_at || '').slice(0, 16)}</td><td>${ops}</td></tr>`;
+  }).join('');
+}
+async function addUser() {
+  const r = await api('/api/admin/users', { method: 'POST', body: { username: $('nuName').value.trim(), password: $('nuPwd').value, role: $('nuRole').value, mobile: $('nuMobile').value.trim() } });
+  if (r.code === 0) { toast('账号已创建'); $('nuName').value = ''; $('nuPwd').value = ''; $('nuMobile').value = ''; loadUsers(); }
+  else toast(r.msg);
+}
+async function resetPwd(id, name) {
+  const p = prompt(`为「${name}」设置新密码（至少 6 位）：`);
+  if (!p) return;
+  const r = await api(`/api/admin/users/${id}/reset`, { method: 'POST', body: { password: p } });
+  r.code === 0 ? toast('密码已重置') : toast(r.msg);
+}
+async function toggleUser(id) { await api(`/api/admin/users/${id}/toggle`, { method: 'POST' }); loadUsers(); }
+async function delUser(id, name) {
+  if (!confirm(`确认删除账号「${name}」？`)) return;
+  const r = await api(`/api/admin/users/${id}`, { method: 'DELETE' });
+  r.code === 0 ? loadUsers() : toast(r.msg);
+}
+
+// 钉钉通知链接 ?order=123：自动切到订餐记录并高亮该单
+async function focusOrder(id) {
+  switchTab('orders');
+  $('fStatus').value = ''; $('fDate').value = '';
+  await loadOrders();
+  const row = document.querySelector(`#orderBody tr[data-id="${id}"]`);
+  if (row) {
+    row.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    row.style.background = '#FDF0D9';
+    setTimeout(() => row.style.background = '', 4000);
+  } else {
+    toast(`订单 #${id} 不在当前列表（可能已超出近 500 条）`);
+  }
 }
 
 // ===== 看板 =====
@@ -309,7 +388,7 @@ async function loadOrders() {
   const r = await api('/api/admin/orders?' + q.toString());
   checked.clear(); updCount();
   const MEAL = { breakfast: '早', lunch: '午', dinner: '晚' };
-  $('orderBody').innerHTML = r.data.map(o => `<tr>
+  $('orderBody').innerHTML = r.data.map(o => `<tr data-id="${o.id}">
     <td><input type="checkbox" onchange="chk('${o.id}',this.checked)" ${o.status === 'rejected' ? 'disabled' : ''}></td>
     <td>${o.meal_date}</td>
     <td>${o.meal_type.split(',').map(m => MEAL[m] || m).join('')}</td>
@@ -466,8 +545,13 @@ async function delDept(i) { depts.splice(i, 1); await api('/api/admin/dept', { m
 async function init() {
   await loadPlaces();
   await loadDash();
+  const oid = new URLSearchParams(location.search).get('order');
+  if (oid) focusOrder(oid);
 }
-if (token) { $('loginBox').style.display = 'none'; $('main').style.display = 'block'; init(); }
+if (token) {
+  $('loginBox').style.display = 'none'; $('main').style.display = 'block';
+  applyRole(); init();
+}
 </script>
 </body>
 </html>

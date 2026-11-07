@@ -171,6 +171,8 @@ async function notifyNewOrder(order) {
     console.warn(`[dingtalk] 区域「${areaName}」暂无成员，通知跳过`);
     return { ok: false, reason: 'no_members' };
   }
+  // 管理端地址：优先配置表/环境变量（正式环境时配置公网地址即可）
+  const adminBase = (await getConfig('admin_base_url')) || 'http://10.1.4.23:48081/admin/';
   const text = [
     `### 【外部人员就餐通知 · ${areaName}】`,
     `- 用餐日期：**${fmtDate(order.meal_date)}**`,
@@ -179,7 +181,8 @@ async function notifyNewOrder(order) {
     `- 联系人电话：${order.phone}`,
     `- 被访问部门：${order.host_dept}`,
     `- 访问人：${order.visit_to || '-'}`,
-    `- 人数：**${order.headcount}**`
+    `- 人数：**${order.headcount}**`,
+    `\n👉 [点此登录管理端，为该单分配地点](${adminBase}?order=${order.id})`
   ].join('\n');
   return sendDingtalkMarkdown(`外部人员就餐通知 · ${areaName}`, text, ats);
 }

@@ -33,7 +33,8 @@ async function getConfig(key) {
     dingtalk_agent_id: process.env.DINGTALK_AGENT_ID,
     dingtalk_webhook: process.env.DINGTALK_WEBHOOK,
     dingtalk_secret: process.env.DINGTALK_SECRET,
-    admin_password: process.env.ADMIN_PASSWORD
+    admin_password: process.env.ADMIN_PASSWORD,
+    admin_base_url: process.env.ADMIN_BASE_URL
   };
   if (envMap[key]) return envMap[key];
   return cfgCache ? cfgCache[key] : undefined;
