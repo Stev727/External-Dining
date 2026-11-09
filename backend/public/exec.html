@@ -19,6 +19,7 @@
   button { flex: 1; padding: 13px 0; border: none; border-radius: 10px; font-size: 15px; font-weight: 600; cursor: pointer; }
   .yes { background: #0f6e56; color: #fff; }
   .no { background: #fff; color: #a32d2d; border: 1px solid #d9a0a0; }
+  .cancel { background: #fff; color: #666; border: 1px solid #ccc; font-weight: 400; }
   .result { text-align: center; padding: 20px 0; font-size: 16px; font-weight: 600; }
   .result.ok { color: #0f6e56; }
   .result.err { color: #a32d2d; }
@@ -57,7 +58,8 @@ async function load() {
       <button class="yes" onclick="send('yes')">确认就餐</button>
       <button class="no" onclick="send('no')">不就餐</button>
     </div>
-    <div class="tip">确认结果将自动计入就餐统计；封账前可随时修改。</div>`;
+    ${d.status !== 'pending' ? `<div class="btns" style="margin-top:10px"><button class="cancel" onclick="send('cancel')">取消本次确认（有变更时使用）</button></div>` : ''}
+    <div class="tip">确认结果将自动计入就餐统计；封账前可随时修改或取消。</div>`;
 }
 
 async function send(status) {

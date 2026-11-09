@@ -49,7 +49,7 @@ router.post('/confirm', async (req, res) => {
     const { e, d, t, status, headcount, meal_type } = req.body;
     const id = parseInt(e);
     if (!id || !d || !verifyToken(id, d, t)) return res.json({ code: 403, msg: '链接无效或已过期' });
-    if (!['yes', 'no'].includes(status)) return res.json({ code: 400, msg: '参数错误' });
+    if (!['yes', 'no', 'cancel'].includes(status)) return res.json({ code: 400, msg: '参数错误' });
     const [execs] = await pool.query('SELECT * FROM meal_exec WHERE id=? AND enabled=1', [id]);
     if (!execs.length) return res.json({ code: 404, msg: '名单中无此人' });
     const ex = execs[0];
@@ -84,6 +84,16 @@ router.post('/confirm', async (req, res) => {
         [id, d, 'yes', mt, hc, orderId]
       );
       res.json({ code: 0, msg: '已确认就餐' });
+    } else if (status === 'cancel') {
+      if (old?.order_id) {
+        await pool.query(`UPDATE meal_order SET status='rejected', reject_reason='高管取消确认' WHERE id=?`, [old.order_id]);
+      }
+      await pool.query(
+        `INSERT INTO meal_exec_confirm (exec_id, d, status, confirm_at) VALUES (?,?,?,NOW())
+         ON DUPLICATE KEY UPDATE status=VALUES(status), order_id=NULL, confirm_at=NULL`,
+        [id, d, 'pending']
+      );
+      res.json({ code: 0, msg: '已取消确认，可重新选择' });
     } else {
       if (old?.order_id) {
         await pool.query(`UPDATE meal_order SET status='rejected', reject_reason='高管确认不就餐' WHERE id=?`, [old.order_id]);

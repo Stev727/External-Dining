@@ -108,4 +108,4 @@ async function execPushTick() {
   return r;
 }
 
-module.exports = { confirmToken, verifyToken, isWorkday, pushFor, execPushTick, nowBJ, getPushTimes };
+module.exports = { confirmToken, verifyToken, isWorkday, pushFor, execPushTick, nowBJ, getPushTimes, fmtD };
