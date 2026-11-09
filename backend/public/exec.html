@@ -60,7 +60,7 @@ async function load() {
           <button class="no" onclick="send('no')">不就餐</button>
         </div>`
       : d.status === 'yes'
-        ? `<div class="btns"><button class="cancel" style="color:#a32d2d;border-color:#d9a0a0" onclick="send('cancel')">取消就餐（有变更时使用）</button></div>`
+        ? `<div class="btns"><button class="no" onclick="send('cancel')">取消就餐（有变更时使用）</button></div>`
         : `<div class="btns"><button class="yes" onclick="send('yes')">确认就餐</button></div>`}
     <div class="tip">确认结果将自动计入就餐统计；封账前可随时修改或取消。</div>`;
 }
