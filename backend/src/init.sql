@@ -18,6 +18,7 @@ CREATE TABLE IF NOT EXISTS meal_order (
   status VARCHAR(20) NOT NULL DEFAULT 'pending' COMMENT 'pending/assigned/rejected',
   assigned_place VARCHAR(20) DEFAULT NULL COMMENT '分配地点 canteen/executive',
   assigned_at DATETIME DEFAULT NULL,
+  assigned_by VARCHAR(10) NOT NULL DEFAULT 'admin' COMMENT '分配来源: user=外部人员自选, admin=管理端分配',
   reject_reason VARCHAR(200) DEFAULT NULL,
   push_status VARCHAR(20) NOT NULL DEFAULT 'none' COMMENT '订阅消息推送状态 none/sent/no_quota/failed',
   est_amount DECIMAL(10,2) DEFAULT NULL COMMENT '预计金额=人数x单价',

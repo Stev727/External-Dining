@@ -72,7 +72,7 @@ router.post('/order', auth, async (req, res) => {
     const ip = req.headers['x-real-ip'] || req.socket.remoteAddress || '';
     if (rateLimit('ip:' + ip, 60000, 5)) return res.json({ code: 429, msg: '操作过于频繁，请稍后再试' });
 
-    const { meal_date, meal_type, name, phone, company, host_dept, headcount, remark, area_id, visit_to } = req.body;
+    const { meal_date, meal_type, name, phone, company, host_dept, headcount, remark, area_id, visit_to, place } = req.body;
     if (!meal_date || !meal_type || !name || !phone || !company || !host_dept) {
       return res.json({ code: 400, msg: '请填写完整必填项' });
     }
@@ -94,16 +94,44 @@ router.post('/order', auth, async (req, res) => {
       }
     }
 
+    // 自选就餐地点：选了具体地点则直接进入已分配状态；未选/unknown 交管理端分配
+    let selfPlace = null;
+    if (place && place !== 'unknown') {
+      const [pr] = await pool.query('SELECT * FROM meal_place WHERE code=? AND enabled=1', [place]);
+      if (!pr.length) return res.json({ code: 400, msg: '所选就餐地点不存在或已停用' });
+      selfPlace = pr[0];
+    }
+
     const [r] = await pool.query(
       `INSERT INTO meal_order (query_code, openid, meal_date, meal_type, name, phone, company, host_dept, headcount, remark, area_id, visit_to, client_ip)
        VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)`,
       [genQueryCode(), openid, meal_date, meal_type, name, phone, company, host_dept, headcount || 1, remark || '', area_id, visit_to.trim(), ip]
     );
+    if (selfPlace) {
+      await pool.query(
+        `UPDATE meal_order SET status='assigned', assigned_place=?, assigned_at=NOW(), assigned_by='user', est_amount=? WHERE id=?`,
+        [selfPlace.code, (headcount || 1) * (+selfPlace.price || 0), r.insertId]
+      );
+    }
     await pool.query('UPDATE wx_user SET name=?, phone=? WHERE openid=?', [name, phone, openid]);
 
     const [rows] = await pool.query('SELECT * FROM meal_order WHERE id=?', [r.insertId]);
     notifyNewOrder(rows[0]); // 异步，不阻塞响应
-    res.json({ code: 0, data: { query_code: rows[0].query_code } });
+    if (selfPlace && openid) {
+      // 自选地点即视为分配完成，当场推送订阅消息（异步）
+      const { sendSubscribeMessage, buildAssignMsg } = require('../services/wechat');
+      sendSubscribeMessage(openid, buildAssignMsg(rows[0]))
+        .then(rr => pool.query('UPDATE meal_order SET push_status=? WHERE id=?', [rr.status, r.insertId]))
+        .catch(() => {});
+    }
+    res.json({
+      code: 0,
+      data: {
+        query_code: rows[0].query_code,
+        self_assigned: !!selfPlace,
+        place_name: selfPlace ? selfPlace.name : ''
+      }
+    });
   } catch (e) {
     res.json({ code: 500, msg: e.message });
   }
@@ -148,7 +176,8 @@ router.get('/config', async (req, res) => {
   let list = [];
   try { list = JSON.parse(depts || '[]'); } catch (e) { /* ignore */ }
   const [areas] = await pool.query('SELECT id, name FROM meal_area WHERE enabled=1 ORDER BY sort, id');
-  res.json({ code: 0, data: { host_depts: list, areas } });
+  const [places] = await pool.query('SELECT code, name FROM meal_place WHERE enabled=1 ORDER BY sort, id');
+  res.json({ code: 0, data: { host_depts: list, areas, places } });
 });
 
 module.exports = router;

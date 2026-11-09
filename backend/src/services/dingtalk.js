@@ -173,6 +173,13 @@ async function notifyNewOrder(order) {
   }
   // 管理端地址：优先配置表/环境变量（正式环境时配置公网地址即可）
   const adminBase = (await getConfig('admin_base_url')) || 'http://10.1.4.23:48081/admin/';
+  const selfSelected = order.assigned_by === 'user';
+  const placeLine = order.assigned_place
+    ? `- 就餐地点：**${(await getPlaces())[order.assigned_place] || order.assigned_place}**${selfSelected ? '（外部人员自选）' : ''}`
+    : '- 就餐地点：**待分配**（请在管理端分配）';
+  const linkLine = order.assigned_place
+    ? (selfSelected ? '- ✅ 该单已自选地点，无需分配' : `- 👉 [点此登录管理端，可改派或维护](${adminBase}?order=${order.id})`)
+    : `\n👉 [点此登录管理端，为该单分配地点](${adminBase}?order=${order.id})`;
   const text = [
     `### 【外部人员就餐通知 · ${areaName}】`,
     `- 用餐日期：**${fmtDate(order.meal_date)}**`,
@@ -182,7 +189,8 @@ async function notifyNewOrder(order) {
     `- 被访问部门：${order.host_dept}`,
     `- 访问人：${order.visit_to || '-'}`,
     `- 人数：**${order.headcount}**`,
-    `\n👉 [点此登录管理端，为该单分配地点](${adminBase}?order=${order.id})`
+    placeLine,
+    linkLine
   ].join('\n');
   return sendDingtalkMarkdown(`外部人员就餐通知 · ${areaName}`, text, ats);
 }

@@ -504,7 +504,7 @@ async function loadOrders(opts = {}) {
     <td>${o.meal_type.split(',').map(m => MEAL[m] || m).join('')}</td>
     <td>${o.name}</td><td>${o.phone}</td>    <td>${o.company}</td><td>${o.host_dept}</td>
     <td><span title="点击修改人数" style="cursor:pointer;border-bottom:1px dashed #185fa5;color:#185fa5" onclick="editHeadcount(${o.id},${o.headcount})">${o.headcount}</span></td>
-    <td><span class="tag ${o.status}">${{pending:'待分配',assigned:'已分配',rejected:'已拒绝'}[o.status]}</span></td>
+    <td><span class="tag ${o.status}">${{pending:'待分配',assigned:'已分配',rejected:'已拒绝'}[o.status]}</span>${o.status === 'assigned' && o.assigned_by === 'user' ? ' <span title="外部人员提交时自选" style="font-size:11px;color:#854f0b">自选</span>' : ''}</td>
     <td>${o.assigned_place ? placeName(o.assigned_place) : '-'}</td>
     <td>${o.est_amount != null ? '¥' + o.est_amount : '-'}</td>
     <td>${o.actual_amount != null ? '<b style="color:#0f6e56">¥' + o.actual_amount + '</b>' : '-'}</td>

@@ -43,6 +43,12 @@
       </picker>
     </view>
     <view class="form-item">
+      <view class="form-label">就餐地点</view>
+      <picker range="{{placeOptions}}" range-key="name" value="{{placeIndex}}" bindchange="onPlaceChange">
+        <view>{{placeOptions[placeIndex].name}}</view>
+      </picker>
+    </view>
+    <view class="form-item">
       <view class="form-label">人数</view>
       <input type="number" value="{{form.headcount}}" data-field="headcount" bindinput="onInput" />
     </view>
@@ -54,14 +60,14 @@
   <view class="btn-area">
     <button class="btn-primary" disabled="{{submitting}}" bindtap="submit">{{submitting ? '提交中...' : '提交订餐'}}</button>
   </view>
-  <view class="tip">提交后由被访部门为您分配用餐地点，分配结果可在「订餐查询」查看。</view>
+  <view class="tip">若公司内部已安排好就餐地点，请直接选择；不确定则选择「不确定，由管理员分配」，分配结果可在「订餐查询」查看。</view>
 </view>
 
 <view wx:else class="success-box">
   <view style="font-size:32rpx">提交成功 🎉</view>
   <view style="font-size:26rpx;color:#888;margin-top:10rpx">您的查询凭证码（请截图保存）</view>
   <view class="success-code">{{queryCode}}</view>
-  <view style="font-size:26rpx;color:#888">地点分配完成后可凭此码查询，也将通过微信服务通知推送</view>
+  <view style="font-size:26rpx;color:#888">{{selfAssigned ? '就餐地点：' + selfPlaceName + '（已选定，凭凭证码查看路线指引）' : '地点分配完成后可凭此码查询，也将通过微信服务通知推送'}}</view>
   <button class="btn-primary" style="margin-top:40rpx" bindtap="goQuery">查看订餐状态</button>
   <button style="margin-top:20rpx;background:#fff;color:#185fa5;border:1rpx solid #185fa5;border-radius:44rpx" bindtap="again">再填一单</button>
 </view>
