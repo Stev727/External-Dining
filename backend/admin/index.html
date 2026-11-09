@@ -253,6 +253,13 @@ textarea { width: 100%; min-height: 60px; padding: 9px 12px; border: 1px solid #
         <button class="primary" onclick="saveExecTime()">保存</button>
         <span style="color:#999;font-size:12px">封账时间用于确认页提示</span>
       </div>
+      <div class="row" style="margin-top:10px">
+        <b style="width:110px">取消就餐截止：</b>
+        <span style="font-size:13px;color:#666">早餐</span><input id="exCancelBreakfast" type="time" style="width:105px">
+        <span style="font-size:13px;color:#666">午餐</span><input id="exCancelLunch" type="time" style="width:105px">
+        <span style="font-size:13px;color:#666">晚餐</span><input id="exCancelDinner" type="time" style="width:105px">
+        <span style="color:#999;font-size:12px">确认就餐后超过当天该餐别截止时间，确认页不再显示取消按钮</span>
+      </div>
     </div>
     <div class="card">
       <h3>工作日历 <span style="font-weight:400;color:#888;font-size:13px">｜ 默认周一~周六上班；点击日期切换 上班/休息，可翻月设置公司节假日</span></h3>
@@ -353,6 +360,11 @@ async function loadExecTime() {
   if (!times.length && r.data.exec_push_time) times = [r.data.exec_push_time];
   pushTimes = times.length ? times : ['11:00', '17:00'];
   $('exDeadline').value = r.data.exec_deadline || '20:00';
+  let cd = {};
+  try { cd = JSON.parse(r.data.exec_cancel_deadline || '{}'); } catch (e) { /* ignore */ }
+  $('exCancelBreakfast').value = cd.breakfast || '08:30';
+  $('exCancelLunch').value = cd.lunch || '11:30';
+  $('exCancelDinner').value = cd.dinner || '18:30';
   renderPushTimes();
 }
 let pushTimes = [];
@@ -366,8 +378,12 @@ function addPushTime() { pushTimes.push('12:00'); renderPushTimes(); }
 async function saveExecTime() {
   const times = pushTimes.filter(t => /^\d{2}:\d{2}$/.test(t)).sort();
   if (!times.length) return toast('请至少保留一个推送时间点');
-  const r = await api('/api/admin/settings', { method: 'POST', body: { exec_push_times: JSON.stringify(times), exec_deadline: $('exDeadline').value } });
-  r.code === 0 ? toast('推送时间已保存') : toast(r.msg);
+  const r = await api('/api/admin/settings', { method: 'POST', body: {
+    exec_push_times: JSON.stringify(times),
+    exec_deadline: $('exDeadline').value,
+    exec_cancel_deadline: JSON.stringify({ breakfast: $('exCancelBreakfast').value || '08:30', lunch: $('exCancelLunch').value || '11:30', dinner: $('exCancelDinner').value || '18:30' })
+  } });
+  r.code === 0 ? toast('推送/封账/取消截止时间已保存') : toast(r.msg);
 }
 
 let calMonth = null; // YYYY-MM，null=当月

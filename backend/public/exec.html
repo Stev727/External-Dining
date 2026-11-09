@@ -60,7 +60,9 @@ async function load() {
           <button class="no" onclick="send('no')">不就餐</button>
         </div>`
       : d.status === 'yes'
-        ? `<div class="btns"><button class="no" onclick="send('cancel')">取消就餐（有变更时使用）</button></div>`
+        ? (d.can_cancel
+          ? `<div class="btns"><button class="no" onclick="send('cancel')">取消就餐（${d.cancel_deadline} 前可取消）</button></div>`
+          : `<div style="background:#fdf3f3;border:1px solid #e8c8c8;border-radius:10px;padding:12px;color:#a32d2d;font-size:13.5px;text-align:center">已超过取消截止时间（${d.cancel_deadline}），如需变更请联系管理员</div>`)
         : `<div class="btns"><button class="yes" onclick="send('yes')">确认就餐</button></div>`}
     <div class="tip">确认结果将自动计入就餐统计；封账前可随时修改或取消。</div>`;
 }

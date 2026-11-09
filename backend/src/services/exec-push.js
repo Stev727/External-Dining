@@ -108,4 +108,21 @@ async function execPushTick() {
   return r;
 }
 
-module.exports = { confirmToken, verifyToken, isWorkday, pushFor, execPushTick, nowBJ, getPushTimes, fmtD };
+// 取消截止时间：exec_cancel_deadline JSON 按餐别配置，默认 早08:30/午11:30/晚18:30
+async function getCancelDeadlines() {
+  const v = await getConfig('exec_cancel_deadline');
+  let obj = {};
+  try { obj = JSON.parse(v || '{}'); } catch (e) { /* ignore */ }
+  return { breakfast: obj.breakfast || '08:30', lunch: obj.lunch || '11:30', dinner: obj.dinner || '18:30' };
+}
+function cancelDeadlineFor(deadlines, mealType) {
+  const mt = (mealType || 'lunch').split(',')[0];
+  return deadlines[mt] || deadlines.lunch || '11:30';
+}
+// 当前北京时间是否未超过该餐别取消截止（bj 传入 'sv-SE' 格式便于测试）
+function canCancelNow(deadlines, mealType, bj) {
+  const hm = (bj || nowBJ()).slice(11, 16);
+  return hm < cancelDeadlineFor(deadlines, mealType);
+}
+
+module.exports = { confirmToken, verifyToken, isWorkday, pushFor, execPushTick, nowBJ, getPushTimes, fmtD, getCancelDeadlines, cancelDeadlineFor, canCancelNow };

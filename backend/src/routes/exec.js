@@ -1,6 +1,6 @@
 const express = require('express');
 const { pool, getConfig, getPlaces } = require('../db');
-const { verifyToken } = require('../services/exec-push');
+const { verifyToken, nowBJ, getCancelDeadlines, cancelDeadlineFor, canCancelNow } = require('../services/exec-push');
 
 const router = express.Router();
 
@@ -23,6 +23,9 @@ router.get('/page-data', async (req, res) => {
     const ex = execs[0];
     const [cf] = await pool.query('SELECT * FROM meal_exec_confirm WHERE exec_id=? AND d=?', [id, d]);
     const places = await getPlaces();
+    const deadlines = await getCancelDeadlines();
+    const isYes = (cf[0]?.status || 'pending') === 'yes';
+    const cancelDeadline = cancelDeadlineFor(deadlines, cf[0]?.meal_type || ex.meal_type);
     res.json({
       code: 0,
       data: {
@@ -34,7 +37,9 @@ router.get('/page-data', async (req, res) => {
         place_name: places[ex.place] || ex.place || '高管餐厅',
         status: cf[0]?.status || 'pending',
         deadline: (await getConfig('exec_deadline')) || '20:00',
-        order_id: cf[0]?.order_id || null
+        order_id: cf[0]?.order_id || null,
+        can_cancel: isYes ? canCancelNow(deadlines, cf[0]?.meal_type || ex.meal_type) : false,
+        cancel_deadline: cancelDeadline
       }
     });
   } catch (err) {
@@ -85,6 +90,11 @@ router.post('/confirm', async (req, res) => {
       );
       res.json({ code: 0, msg: '已确认就餐' });
     } else if (status === 'cancel') {
+      const deadlines = await getCancelDeadlines();
+      const dl = cancelDeadlineFor(deadlines, old?.meal_type || ex.meal_type);
+      if (!canCancelNow(deadlines, old?.meal_type || ex.meal_type)) {
+        return res.json({ code: 403, msg: `已超过取消截止时间（${dl}），如需变更请联系管理员` });
+      }
       if (old?.order_id) {
         await pool.query(`UPDATE meal_order SET status='rejected', reject_reason='高管取消确认' WHERE id=?`, [old.order_id]);
       }

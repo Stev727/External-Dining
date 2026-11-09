@@ -383,7 +383,7 @@ router.post('/dept', auth, requireAdmin, async (req, res) => {
 });
 
 // ===== 系统设置（仅管理员）：钉钉应用信息等，推广部署时每家公司在界面各自配置 =====
-const SETTING_KEYS = ['dingtalk_appkey', 'dingtalk_appsecret', 'dingtalk_agent_id', 'dingtalk_webhook', 'dingtalk_secret', 'admin_base_url', 'exec_push_times', 'exec_deadline'];
+const SETTING_KEYS = ['dingtalk_appkey', 'dingtalk_appsecret', 'dingtalk_agent_id', 'dingtalk_webhook', 'dingtalk_secret', 'admin_base_url', 'exec_push_times', 'exec_deadline', 'exec_cancel_deadline'];
 const SECRET_KEYS = ['dingtalk_appsecret', 'dingtalk_secret'];
 function maskSecret(v) {
   if (!v) return '';
