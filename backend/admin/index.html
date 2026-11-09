@@ -3,280 +3,381 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>订餐管理端</title>
+<title>外部人员就餐系统 · 管理端</title>
 <style>
+:root {
+  --primary: #185fa5;
+  --primary-dark: #124a83;
+  --primary-light: #e7f3fc;
+  --success: #0f6e56;
+  --danger: #a32d2d;
+  --warn: #854f0b;
+  --sidebar-bg: #1c2b3a;
+  --sidebar-active: #2a4a6b;
+  --border: #e4e8ef;
+  --text: #2b3445;
+  --text-sub: #7a8598;
+}
 * { box-sizing: border-box; margin: 0; padding: 0; }
-body { font: 14px/1.6 -apple-system, "PingFang SC", "Microsoft YaHei", sans-serif; background: #f5f6f8; color: #333; }
-.login-box { max-width: 360px; margin: 120px auto; background: #fff; border-radius: 12px; padding: 32px; box-shadow: 0 2px 12px rgba(0,0,0,.06); }
-.login-box h2 { font-size: 18px; margin-bottom: 20px; }
-.dash-range { margin-bottom: 12px; display: flex; gap: 8px; align-items: center; }
-.dash-range button { padding: 4px 18px; border-radius: 16px; }
-.dash-range button.on { background: #185FA5; color: #fff; border-color: #185FA5; }
+body { font: 14px/1.6 -apple-system, "PingFang SC", "Microsoft YaHei", sans-serif; background: #f0f2f5; color: var(--text); }
+
+/* ===== 通用控件 ===== */
+input, select, textarea { font: inherit; color: var(--text); }
+input, select { padding: 8px 12px; border: 1px solid #d3d9e2; border-radius: 6px; font-size: 14px; margin-bottom: 12px; background: #fff; transition: border .15s; }
+input:focus, select:focus, textarea:focus { outline: none; border-color: var(--primary); box-shadow: 0 0 0 2px rgba(24,95,165,.12); }
+textarea { width: 100%; min-height: 60px; padding: 9px 12px; border: 1px solid #d3d9e2; border-radius: 6px; }
+button { padding: 7px 16px; border: 1px solid #cfd6e0; border-radius: 6px; background: #fff; cursor: pointer; font-size: 13px; color: var(--text); transition: all .15s; }
+button:hover { border-color: var(--primary); color: var(--primary); }
+button.primary { background: var(--primary); color: #fff; border-color: var(--primary); }
+button.primary:hover { background: var(--primary-dark); }
+button.danger { color: var(--danger); border-color: #e2b4b4; }
+button.danger:hover { background: var(--danger); color: #fff; border-color: var(--danger); }
+button:disabled { opacity: .5; cursor: not-allowed; }
+
+table { width: 100%; border-collapse: collapse; background: #fff; }
+th, td { padding: 10px 12px; border-bottom: 1px solid #eef0f3; text-align: left; font-size: 13px; }
+th { background: var(--primary-light); color: #23415f; font-weight: 500; white-space: nowrap; }
+tbody tr:hover { background: #f7fafd; }
+td { max-width: 180px; word-break: break-all; }
+
+.tag { display: inline-block; padding: 1px 9px; border-radius: 10px; font-size: 12px; }
+.tag.pending { background: #faeeda; color: var(--warn); }
+.tag.assigned { background: #e1f5ee; color: var(--success); }
+.tag.rejected { background: #fcebeb; color: var(--danger); }
+.tag.off { background: #f1efe8; color: #888; }
+
+.card { background: #fff; border-radius: 8px; padding: 20px 22px; margin-bottom: 16px; box-shadow: 0 1px 3px rgba(30,50,80,.06); }
+.card h3 { font-size: 15px; margin-bottom: 14px; padding-left: 9px; border-left: 3px solid var(--primary); line-height: 1.4; }
+.card h3 span { font-weight: 400; }
+.row { display: flex; gap: 10px; align-items: center; margin-bottom: 10px; flex-wrap: wrap; }
+.row input, .row select { width: auto; margin: 0; }
+.hint { color: #98a2b3; font-size: 12px; }
+
+.toolbar { display: flex; gap: 8px; margin: 0 0 14px; flex-wrap: wrap; align-items: center; background: #fff; border-radius: 8px; padding: 14px 16px; box-shadow: 0 1px 3px rgba(30,50,80,.06); }
+.toolbar input, .toolbar select { margin: 0; height: 36px; width: auto; }
+
+.msg { position: fixed; top: 20px; left: 50%; transform: translateX(-50%); background: #22344a; color: #fff; padding: 9px 24px; border-radius: 6px; display: none; z-index: 99; box-shadow: 0 4px 14px rgba(0,0,0,.2); }
+
+/* ===== 登录页 ===== */
+.login-wrap { min-height: 100vh; display: flex; align-items: center; justify-content: center; background: linear-gradient(160deg, #1c2b3a 0%, #185fa5 100%); }
+.login-box { width: 380px; background: #fff; border-radius: 10px; padding: 36px 34px; box-shadow: 0 10px 40px rgba(0,0,0,.25); }
+.login-box .lg-head { text-align: center; margin-bottom: 26px; }
+.login-box .lg-head .lg-icon { font-size: 34px; }
+.login-box h2 { font-size: 18px; margin: 6px 0 2px; color: var(--text); }
+.login-box .lg-sub { font-size: 12.5px; color: var(--text-sub); }
+.login-box input { width: 100%; }
+.login-box button { width: 100%; padding: 10px 0; font-size: 14px; margin-top: 4px; }
+
+/* ===== 整体布局 ===== */
+.layout { display: flex; min-height: 100vh; }
+.sidebar { width: 216px; background: var(--sidebar-bg); color: #b8c4d2; flex-shrink: 0; display: flex; flex-direction: column; position: sticky; top: 0; height: 100vh; overflow-y: auto; }
+.sidebar .logo { padding: 18px 18px 16px; border-bottom: 1px solid rgba(255,255,255,.08); }
+.sidebar .logo b { display: block; color: #fff; font-size: 15px; letter-spacing: .5px; }
+.sidebar .logo span { font-size: 11px; color: #6d7f92; }
+.sidebar nav { flex: 1; padding: 10px 0; }
+.menu-group { padding: 12px 18px 5px; font-size: 11.5px; color: #5f7186; letter-spacing: 1px; }
+.menu-item { display: flex; align-items: center; gap: 10px; padding: 10px 18px; cursor: pointer; font-size: 13.5px; border-left: 3px solid transparent; transition: all .15s; }
+.menu-item svg { width: 16px; height: 16px; flex-shrink: 0; }
+.menu-item:hover { color: #fff; background: rgba(255,255,255,.05); }
+.menu-item.active { color: #fff; background: var(--sidebar-active); border-left-color: #4d9fe8; }
+.sidebar-footer { padding: 12px 18px; font-size: 11px; color: #5f7186; border-top: 1px solid rgba(255,255,255,.08); }
+
+.main-area { flex: 1; display: flex; flex-direction: column; min-width: 0; }
+.topbar { height: 54px; background: #fff; border-bottom: 1px solid var(--border); display: flex; align-items: center; padding: 0 24px; gap: 12px; position: sticky; top: 0; z-index: 10; }
+.topbar h1 { font-size: 15.5px; margin-right: auto; color: var(--text); }
+.user-chip { display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--text-sub); }
+.user-chip .avatar { width: 28px; height: 28px; border-radius: 50%; background: var(--primary); color: #fff; display: flex; align-items: center; justify-content: center; font-size: 13px; }
+.user-chip .role-badge { background: var(--primary-light); color: var(--primary); font-size: 11px; padding: 1px 8px; border-radius: 9px; }
+.content { padding: 20px 24px; flex: 1; }
+
+/* ===== 看板 ===== */
+.dash-range { display: flex; gap: 8px; align-items: center; margin-bottom: 14px; }
+.dash-range button { padding: 5px 20px; border-radius: 16px; font-size: 13px; }
+.dash-range button.on { background: var(--primary); color: #fff; border-color: var(--primary); }
+.dash-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 14px; margin-bottom: 16px; }
+.stat-card { background: #fff; border-radius: 8px; padding: 18px 20px; box-shadow: 0 1px 3px rgba(30,50,80,.06); border-top: 3px solid var(--primary); }
+.stat-card .num { font-size: 26px; font-weight: 600; color: var(--primary); }
+.stat-card .num.green { color: var(--success); }
+.stat-card .num.orange { color: var(--warn); }
+.stat-card .lbl { font-size: 13px; color: var(--text-sub); margin-top: 2px; }
 .mchart { display: flex; align-items: flex-end; gap: 6px; height: 150px; padding: 8px 4px 0; }
 .mcol { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: flex-end; }
-.mbar { width: 68%; background: #378ADD; border-radius: 4px 4px 0 0; min-height: 2px; }
-.mbar:hover { background: #185FA5; }
-.mval { font-size: 11px; color: #185FA5; font-weight: 600; margin-bottom: 3px; }
+.mbar { width: 68%; background: #378add; border-radius: 4px 4px 0 0; min-height: 2px; transition: background .15s; }
+.mbar:hover { background: var(--primary); }
+.mval { font-size: 11px; color: var(--primary); font-weight: 600; margin-bottom: 3px; }
 .mlab { font-size: 11px; color: #98a2b3; margin-top: 5px; }
 .drow { display: flex; align-items: center; gap: 12px; padding: 7px 0; border-bottom: 1px dashed #eef1f5; }
 .drow:last-child { border-bottom: none; }
 .dname { width: 110px; font-size: 13px; color: #40506a; }
-.dbar { flex: 1; background: #F0F3F8; border-radius: 6px; height: 18px; overflow: hidden; }
+.dbar { flex: 1; background: #f0f3f8; border-radius: 6px; height: 18px; overflow: hidden; }
 .dbar div { height: 100%; background: #639922; border-radius: 6px; }
 .dnum { width: 280px; font-size: 12px; color: #666; white-space: nowrap; }
+.two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+@media (max-width: 900px) { .two-col { grid-template-columns: 1fr; } }
+@media (max-width: 760px) { .sidebar { display: none; } }
+
+/* ===== 订餐记录 ===== */
 .pager { display: flex; gap: 10px; align-items: center; justify-content: flex-end; padding: 12px 4px 2px; font-size: 13px; color: #666; flex-wrap: wrap; }
 .pager button { padding: 4px 14px; }
 .pager button:disabled { opacity: .45; cursor: not-allowed; }
-.pager b { color: #185fa5; }
-input, select { width: 100%; padding: 9px 12px; border: 1px solid #d9dce3; border-radius: 8px; font-size: 14px; margin-bottom: 12px; }
-button { padding: 8px 16px; border: 1px solid #d9dce3; border-radius: 8px; background: #fff; cursor: pointer; font-size: 13px; }
-button.primary { background: #185fa5; color: #fff; border-color: #185fa5; }
-button.danger { color: #a32d2d; border-color: #e2b4b4; }
-button:disabled { opacity: .5; cursor: not-allowed; }
-.wrap { max-width: 1280px; margin: 0 auto; padding: 20px; }
-.topbar { display: flex; align-items: center; gap: 12px; margin-bottom: 16px; }
-.topbar h1 { font-size: 17px; margin-right: auto; }
-.tabs { display: flex; gap: 4px; margin-bottom: 14px; border-bottom: 1px solid #e5e7eb; flex-wrap: wrap; }
-.tab { padding: 8px 16px; cursor: pointer; border-bottom: 2px solid transparent; }
-.tab.active { border-color: #185fa5; color: #185fa5; font-weight: 500; }
-table { width: 100%; border-collapse: collapse; background: #fff; border-radius: 8px; overflow: hidden; }
-th, td { padding: 9px 10px; border-bottom: 1px solid #eef0f3; text-align: left; font-size: 13px; }
-th { background: #e7f3fc; color: #333; font-weight: 500; white-space: nowrap; }
-td { max-width: 180px; word-break: break-all; }
-.tag { display: inline-block; padding: 1px 8px; border-radius: 10px; font-size: 12px; }
-.tag.pending { background: #faeeda; color: #854f0b; }
-.tag.assigned { background: #e1f5ee; color: #0f6e56; }
-.tag.rejected { background: #fcebeb; color: #a32d2d; }
-.tag.off { background: #f1efe8; color: #888; }
-.toolbar { display: flex; gap: 8px; margin: 10px 0; flex-wrap: wrap; align-items: center; }
-.toolbar input, .toolbar select { margin: 0; height: 37px; width: auto; }
-.card { background: #fff; border-radius: 12px; padding: 20px; margin-bottom: 16px; }
-.card h3 { font-size: 15px; margin-bottom: 14px; }
-.row { display: flex; gap: 10px; align-items: center; margin-bottom: 10px; flex-wrap: wrap; }
-.row input, .row select { width: auto; margin: 0; }
-.msg { position: fixed; top: 20px; left: 50%; transform: translateX(-50%); background: #333; color: #fff; padding: 8px 20px; border-radius: 8px; display: none; z-index: 99; }
+.pager b { color: var(--primary); }
+.total-row td { font-weight: 500; background: #f5f9fd; }
+
+/* ===== 图片/日历 ===== */
 .imgs { display: flex; gap: 8px; flex-wrap: wrap; }
 .imgs .it { position: relative; }
-.imgs img { width: 90px; height: 68px; object-fit: cover; border-radius: 6px; }
-.imgs .del { position: absolute; top: -6px; right: -6px; width: 18px; height: 18px; border-radius: 50%; background: #a32d2d; color: #fff; border: none; font-size: 11px; line-height: 18px; padding: 0; }
-textarea { width: 100%; min-height: 60px; padding: 9px 12px; border: 1px solid #d9dce3; border-radius: 8px; font: inherit; }
-.sum-wrap { margin-bottom: 14px; }
-.sum-wrap h3 { font-size: 14px; margin-bottom: 8px; color: #0f6e56; }
-.total-row td { font-weight: 500; background: #f5f9fd; }
-.dash-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 12px; margin-bottom: 16px; }
-.stat-card { background: #fff; border-radius: 12px; padding: 18px 20px; }
-.stat-card .num { font-size: 26px; font-weight: 600; color: #185fa5; }
-.stat-card .num.green { color: #0f6e56; }
-.stat-card .num.orange { color: #854f0b; }
-.stat-card .lbl { font-size: 13px; color: #888; margin-top: 2px; }
-.two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
-@media (max-width: 900px) { .two-col { grid-template-columns: 1fr; } }
+.imgs img { width: 90px; height: 68px; object-fit: cover; border-radius: 6px; border: 1px solid var(--border); }
+.imgs .del { position: absolute; top: -6px; right: -6px; width: 18px; height: 18px; border-radius: 50%; background: var(--danger); color: #fff; border: none; font-size: 11px; line-height: 18px; padding: 0; }
+.cal-chip { padding: 6px 10px; border-radius: 8px; font-size: 12px; }
 </style>
 </head>
 <body>
 <div class="msg" id="msg"></div>
 
-<div class="login-box" id="loginBox">
-  <h2>订餐管理端</h2>
-  <input type="text" id="uname" placeholder="账号" onkeydown="if(event.key==='Enter')login()">
-  <input type="password" id="pwd" placeholder="密码" onkeydown="if(event.key==='Enter')login()">
-  <button class="primary" style="width:100%" onclick="login()">登 录</button>
+<!-- 登录页 -->
+<div class="login-wrap" id="loginBox">
+  <div class="login-box">
+    <div class="lg-head">
+      <div class="lg-icon">🍱</div>
+      <h2>外部人员就餐系统</h2>
+      <div class="lg-sub">管理端 · 请使用系统账号登录</div>
+    </div>
+    <input type="text" id="uname" placeholder="账号" onkeydown="if(event.key==='Enter')login()">
+    <input type="password" id="pwd" placeholder="密码" onkeydown="if(event.key==='Enter')login()">
+    <button class="primary" onclick="login()">登 录</button>
+  </div>
 </div>
 
-<div class="wrap" id="main" style="display:none">
-  <div class="topbar">
-    <h1>外部人员订餐 · 管理端</h1>
-    <button onclick="logout()">退出</button>
-  </div>
-  <div class="tabs">
-    <div class="tab active" data-tab="dash" onclick="switchTab('dash')">看板</div>
-    <div class="tab" data-tab="orders" onclick="switchTab('orders')">订餐记录</div>
-    <div class="tab" data-tab="place" onclick="switchTab('place')" data-admin="1">地点与路线</div>
-    <div class="tab" data-tab="area" onclick="switchTab('area')" data-admin="1">区域与成员</div>
-    <div class="tab" data-tab="dept" onclick="switchTab('dept')" data-admin="1">被访部门</div>
-    <div class="tab" data-tab="users" onclick="switchTab('users')" data-admin="1">用户管理</div>
-    <div class="tab" data-tab="settings" onclick="switchTab('settings')" data-admin="1">系统设置</div>
-    <div class="tab" data-tab="exec" onclick="switchTab('exec')" data-admin="1">高管就餐</div>
-  </div>
+<!-- 主布局 -->
+<div class="layout" id="main" style="display:none">
+  <aside class="sidebar">
+    <div class="logo"><b>外部人员就餐系统</b><span>Management Console</span></div>
+    <nav>
+      <div class="menu-group">概览</div>
+      <div class="menu-item active" data-tab="dash" onclick="switchTab('dash')">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
+        运营看板</div>
+      <div class="menu-item" data-tab="orders" onclick="switchTab('orders')">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg>
+        订餐记录</div>
+      <div class="menu-group" data-admin="1">业务配置</div>
+      <div class="menu-item" data-tab="place" data-admin="1" onclick="switchTab('place')">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
+        地点与路线</div>
+      <div class="menu-item" data-tab="area" data-admin="1" onclick="switchTab('area')">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+        区域与成员</div>
+      <div class="menu-item" data-tab="dept" data-admin="1" onclick="switchTab('dept')">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 21h18"/><path d="M5 21V7l8-4v18"/><path d="M19 21V11l-6-4"/><line x1="9" y1="9" x2="9.01" y2="9"/><line x1="9" y1="13" x2="9.01" y2="13"/></svg>
+        被访部门</div>
+      <div class="menu-item" data-tab="exec" data-admin="1" onclick="switchTab('exec')">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+        高管就餐</div>
+      <div class="menu-group" data-admin="1">系统管理</div>
+      <div class="menu-item" data-tab="users" data-admin="1" onclick="switchTab('users')">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+        用户管理</div>
+      <div class="menu-item" data-tab="settings" data-admin="1" onclick="switchTab('settings')">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+        系统设置</div>
+    </nav>
+    <div class="sidebar-footer">中坚科技 · 内部系统</div>
+  </aside>
 
-  <!-- 看板 -->
-  <div id="tab-dash">
-    <div class="dash-range">
-      <span style="color:#666;font-size:13px">统计范围：</span>
-      <button id="rgMonth" onclick="setRange('month')">本月</button>
-      <button id="rgYear" onclick="setRange('year')">今年</button>
-      <button id="rgAll" onclick="setRange('all')">全部</button>
-      <span style="color:#999;font-size:12px;margin-left:6px">金额与部门维度跟随范围；月度趋势固定近 12 个月</span>
-    </div>
-    <div class="dash-grid" id="dashCards"></div>
-    <div class="card">
-      <h3>月度就餐人数（近 12 个月）</h3>
-      <div id="monthChart"></div>
-      <table style="margin-top:6px"><thead><tr><th>月份</th><th>就餐人数</th><th>单数</th><th>预计金额</th><th>真实金额</th></tr></thead><tbody id="mBody"></tbody></table>
-    </div>
-    <div class="card">
-      <h3>被访部门 · 人数与金额（<span id="rgLabel">本月</span>）</h3>
-      <div id="deptChart"></div>
-    </div>
-    <div class="two-col">
-      <div class="card"><h3>今日 · 按地点</h3><table><thead><tr id="dpHead"></tr></thead><tbody id="dpBody"></tbody></table></div>
-      <div class="card"><h3>今日 · 按被访部门</h3><table><thead><tr><th>部门</th><th>单数</th><th>人数</th></tr></thead><tbody id="ddBody"></tbody></table></div>
-    </div>
-    <div class="card"><h3>最新提交</h3><table><thead><tr><th>时间</th><th>姓名</th><th>单位/部门</th><th>被访部门</th><th>用餐日期</th><th>餐别</th><th>人数</th><th>状态</th></tr></thead><tbody id="drBody"></tbody></table></div>
-  </div>
+  <div class="main-area">
+    <header class="topbar">
+      <h1 id="pageTitle">运营看板</h1>
+      <div class="user-chip">
+        <span id="userRole" class="role-badge"></span>
+        <span id="userName"></span>
+        <div class="avatar" id="userAvatar"></div>
+        <button onclick="logout()" style="padding:4px 14px">退出</button>
+      </div>
+    </header>
 
-  <!-- 订餐记录 + 统计 -->
-  <div id="tab-orders" style="display:none">
-    <div class="toolbar">
-      <input type="date" id="fDate" style="width:150px" onchange="reloadOrders()">
-      <select id="fStatus" style="width:120px" onchange="loadOrders()">
-        <option value="">全部状态</option>
-        <option value="pending">待分配</option>
-        <option value="assigned">已分配</option>
-        <option value="rejected">已拒绝</option>
-      </select>
-      <button class="primary" onclick="batchAssign()">批量分配选中</button>
-      <select id="assignPlace" style="width:150px"></select>
-      <button onclick="batchUnassign()">取消分配选中</button>
-      <button class="danger" onclick="batchReject()">拒绝选中</button>
-      <button onclick="exportExcel()">导出 Excel</button>
-      <span id="selCount" style="color:#888"></span>
+    <div class="content">
+    <!-- 看板 -->
+    <div id="tab-dash">
+      <div class="dash-range">
+        <span class="hint">统计范围：</span>
+        <button id="rgMonth" onclick="setRange('month')">本月</button>
+        <button id="rgYear" onclick="setRange('year')">今年</button>
+        <button id="rgAll" onclick="setRange('all')">全部</button>
+        <span class="hint" style="margin-left:6px">金额与部门维度跟随范围；月度趋势固定近 12 个月</span>
+      </div>
+      <div class="dash-grid" id="dashCards"></div>
+      <div class="card">
+        <h3>月度就餐人数（近 12 个月）</h3>
+        <div id="monthChart"></div>
+        <table style="margin-top:6px"><thead><tr><th>月份</th><th>就餐人数</th><th>单数</th><th>预计金额</th><th>真实金额</th></tr></thead><tbody id="mBody"></tbody></table>
+      </div>
+      <div class="card">
+        <h3>被访部门 · 人数与金额（<span id="rgLabel">本月</span>）</h3>
+        <div id="deptChart"></div>
+      </div>
+      <div class="two-col">
+        <div class="card"><h3>今日 · 按地点</h3><table><thead><tr id="dpHead"></tr></thead><tbody id="dpBody"></tbody></table></div>
+        <div class="card"><h3>今日 · 按被访部门</h3><table><thead><tr><th>部门</th><th>单数</th><th>人数</th></tr></thead><tbody id="ddBody"></tbody></table></div>
+      </div>
+      <div class="card"><h3>最新提交</h3><table><thead><tr><th>时间</th><th>姓名</th><th>单位/部门</th><th>被访部门</th><th>用餐日期</th><th>餐别</th><th>人数</th><th>状态</th></tr></thead><tbody id="drBody"></tbody></table></div>
     </div>
-    <table>
-      <thead><tr>
-        <th><input type="checkbox" onchange="toggleAll(this)"></th>
-        <th>日期</th><th>餐别</th><th>姓名</th><th>电话</th><th>单位/部门</th>
-        <th>被访部门</th><th>人数</th><th>状态</th><th>地点</th><th>预计金额</th><th>真实金额</th><th>推送</th><th>被访问人</th><th>备注</th><th>操作</th><th>凭证码</th>
-      </tr></thead>
-      <tbody id="orderBody"></tbody>
-    </table>
-    <div class="pager" id="pager"></div>
-  </div>
 
-  <!-- 地点与路线（合并） -->
-  <div id="tab-place" style="display:none">
-    <div class="card">
-      <h3>添加用餐地点</h3>
-      <div class="row">
-        <input id="newPlace" placeholder="地点名称，如：二食堂" style="width:180px">
-        <input id="newPlacePrice" placeholder="人均单价（元）" style="width:130px" type="number" step="0.01">
-        <button class="primary" onclick="addPlace()">添加</button>
-        <span style="color:#999;font-size:12px">单价用于"预计金额 = 人数 × 单价"，分配时自动快照；改价只影响之后的新分配</span>
+    <!-- 订餐记录 -->
+    <div id="tab-orders" style="display:none">
+      <div class="toolbar">
+        <input type="date" id="fDate" style="width:150px" onchange="reloadOrders()">
+        <select id="fStatus" style="width:120px" onchange="loadOrders()">
+          <option value="">全部状态</option>
+          <option value="pending">待分配</option>
+          <option value="assigned">已分配</option>
+          <option value="rejected">已拒绝</option>
+        </select>
+        <button class="primary" onclick="batchAssign()">批量分配选中</button>
+        <select id="assignPlace" style="width:150px"></select>
+        <button onclick="batchUnassign()">取消分配选中</button>
+        <button class="danger" onclick="batchReject()">拒绝选中</button>
+        <button onclick="exportExcel()">导出 Excel</button>
+        <span id="selCount" style="color:#888"></span>
+      </div>
+      <div class="card" style="padding:0">
+        <table>
+          <thead><tr>
+            <th><input type="checkbox" onchange="toggleAll(this)"></th>
+            <th>日期</th><th>餐别</th><th>姓名</th><th>电话</th><th>单位/部门</th>
+            <th>被访部门</th><th>人数</th><th>状态</th><th>地点</th><th>预计金额</th><th>真实金额</th><th>推送</th><th>被访问人</th><th>备注</th><th>操作</th><th>凭证码</th>
+          </tr></thead>
+          <tbody id="orderBody"></tbody>
+        </table>
+      </div>
+      <div class="pager" id="pager"></div>
+    </div>
+
+    <!-- 地点与路线 -->
+    <div id="tab-place" style="display:none">
+      <div class="card">
+        <h3>添加用餐地点</h3>
+        <div class="row">
+          <input id="newPlace" placeholder="地点名称，如：二食堂" style="width:180px">
+          <input id="newPlacePrice" placeholder="人均单价（元）" style="width:130px" type="number" step="0.01">
+          <button class="primary" onclick="addPlace()">添加</button>
+          <span class="hint">单价用于"预计金额 = 人数 × 单价"，分配时自动快照；改价只影响之后的新分配</span>
+        </div>
+      </div>
+      <div id="routeCards"></div>
+    </div>
+
+    <!-- 区域与成员 -->
+    <div id="tab-area" style="display:none">
+      <div class="card">
+        <h3>添加区域</h3>
+        <div class="row">
+          <input id="newArea" placeholder="区域名称，如：A区/二工厂" style="width:200px">
+          <button class="primary" onclick="addArea()">添加</button>
+          <span class="hint">外部人员填报时选择区域；提交后钉钉通知自动发给该区域的成员</span>
+        </div>
+      </div>
+      <div id="areaCards"></div>
+    </div>
+
+    <!-- 被访部门 -->
+    <div id="tab-dept" style="display:none">
+      <div class="card">
+        <h3>被访部门选项（小程序下拉）</h3>
+        <div class="row"><input id="newDept" placeholder="部门名称" style="width:200px"><button class="primary" onclick="addDept()">添加</button></div>
+        <div id="deptList" class="row"></div>
       </div>
     </div>
-    <div id="routeCards"></div>
-  </div>
 
-  <!-- 区域与成员 -->
-  <div id="tab-area" style="display:none">
-    <div class="card">
-      <h3>添加区域</h3>
-      <div class="row">
-        <input id="newArea" placeholder="区域名称，如：A区/二工厂" style="width:200px">
-        <button class="primary" onclick="addArea()">添加</button>
-        <span style="color:#999;font-size:12px">外部人员填报时选择区域；提交后钉钉通知自动发给该区域的成员</span>
+    <!-- 用户管理 -->
+    <div id="tab-users" style="display:none">
+      <div class="card">
+        <h3>新增账号</h3>
+        <div class="row">
+          <input id="nuName" placeholder="用户名（3-20位字母数字）" style="width:200px">
+          <input id="nuPwd" placeholder="密码（至少6位）" style="width:150px" type="password">
+          <select id="nuRole" style="width:130px"><option value="operator">操作员</option><option value="admin">管理员</option></select>
+          <input id="nuMobile" placeholder="手机号（选填）" style="width:140px">
+          <button class="primary" onclick="addUser()">创建账号</button>
+        </div>
+        <span class="hint">管理员：可维护地点/区域/部门/账号；操作员：仅分配、改人数、维护真实金额、看板与导出</span>
+      </div>
+      <div class="card">
+        <h3>账号列表</h3>
+        <table><thead><tr><th>用户名</th><th>角色</th><th>手机号</th><th>状态</th><th>创建时间</th><th>操作</th></tr></thead><tbody id="userBody"></tbody></table>
       </div>
     </div>
-    <div id="areaCards"></div>
-  </div>
 
-  <!-- 被访部门 -->
-  <div id="tab-dept" style="display:none">
-    <div class="card">
-      <h3>被访部门选项（小程序下拉）</h3>
-      <div class="row"><input id="newDept" placeholder="部门名称" style="width:200px"><button class="primary" onclick="addDept()">添加</button></div>
-      <div id="deptList" class="row"></div>
+    <!-- 系统设置 -->
+    <div id="tab-settings" style="display:none">
+      <div class="card">
+        <h3>钉钉应用配置</h3>
+        <div class="row"><b style="width:130px">AppKey：</b><input id="stAppkey" style="width:320px" placeholder="企业内部应用 AppKey"></div>
+        <div class="row"><b style="width:130px">AppSecret：</b><input id="stSecret" style="width:320px" type="password" placeholder="留空或保持掩码不变 = 不修改"><span class="hint">已保存的值以掩码显示</span></div>
+        <div class="row"><b style="width:130px">AgentId：</b><input id="stAgent" style="width:200px" placeholder="应用 AgentId"></div>
+        <span class="hint">用于机器人单聊/工作通知推送；修改后立即生效（推送新订单时使用新配置）</span>
+      </div>
+      <div class="card">
+        <h3>通知与管理端地址</h3>
+        <div class="row"><b style="width:130px">管理端地址：</b><input id="stBase" style="width:380px" placeholder="如 https://meal.xxx.com/admin/"></div>
+        <span class="hint">钉钉通知里"点此登录管理端"链接使用该地址；正式环境配置公网 HTTPS 地址</span>
+      </div>
+      <div class="card">
+        <h3>群机器人 Webhook（备用通道，选填）</h3>
+        <div class="row"><b style="width:130px">Webhook：</b><input id="stWebhook" style="width:380px" placeholder="机器人 Webhook 地址，不启用则留空"></div>
+        <div class="row"><b style="width:130px">加签密钥：</b><input id="stWSecret" style="width:320px" type="password" placeholder="留空或保持掩码不变 = 不修改"></div>
+        <span class="hint">机器人单聊/工作通知失败时降级使用；只推群聊场景才需要</span>
+        <div class="row" style="margin-top:12px"><button class="primary" onclick="saveSettings()">保存全部设置</button></div>
+      </div>
     </div>
-  </div>
 
-  <!-- 用户管理 -->
-  <div id="tab-users" style="display:none">
-    <div class="card">
-      <h3>新增账号</h3>
-      <div class="row">
-        <input id="nuName" placeholder="用户名（3-20位字母数字）" style="width:200px">
-        <input id="nuPwd" placeholder="密码（至少6位）" style="width:150px" type="password">
-        <select id="nuRole" style="width:130px"><option value="operator">操作员</option><option value="admin">管理员</option></select>
-        <input id="nuMobile" placeholder="手机号（选填）" style="width:140px">
-        <button class="primary" onclick="addUser()">创建账号</button>
+    <!-- 高管就餐 -->
+    <div id="tab-exec" style="display:none">
+      <div class="card">
+        <h3>高管名单 <span class="hint">｜ 到推送时间点自动钉钉提醒确认，确认结果自动生成订单进统计</span></h3>
+        <div class="row">
+          <input id="neName" placeholder="姓名" style="width:100px">
+          <input id="neMobile" placeholder="钉钉手机号" style="width:140px">
+          <input id="neDept" placeholder="部门" style="width:120px">
+          <select id="neMeal" style="width:110px"><option value="lunch">午餐</option><option value="dinner">晚餐</option><option value="breakfast">早餐</option><option value="lunch,dinner">午+晚</option></select>
+          <button class="primary" onclick="addExec()">添加</button>
+        </div>
+        <table><thead><tr><th>姓名</th><th>手机号</th><th>部门</th><th>默认餐别</th><th>状态</th><th>操作</th></tr></thead><tbody id="execBody"></tbody></table>
       </div>
-      <span style="color:#999;font-size:12px">管理员：可维护地点/区域/部门/账号；操作员：仅分配、改人数、维护真实金额、看板与导出</span>
-    </div>
-    <div class="card">
-      <h3>账号列表</h3>
-      <table><thead><tr><th>用户名</th><th>角色</th><th>手机号</th><th>状态</th><th>创建时间</th><th>操作</th></tr></thead><tbody id="userBody"></tbody></table>
-    </div>
-  </div>
-
-  <!-- 系统设置 -->
-  <div id="tab-settings" style="display:none">
-    <div class="card">
-      <h3>钉钉应用配置</h3>
-      <div class="row"><b style="width:130px">AppKey：</b><input id="stAppkey" style="width:320px" placeholder="企业内部应用 AppKey"></div>
-      <div class="row"><b style="width:130px">AppSecret：</b><input id="stSecret" style="width:320px" type="password" placeholder="留空或保持掩码不变 = 不修改"><span style="color:#999;font-size:12px">已保存的值以掩码显示</span></div>
-      <div class="row"><b style="width:130px">AgentId：</b><input id="stAgent" style="width:200px" placeholder="应用 AgentId"></div>
-      <span style="color:#999;font-size:12px">用于机器人单聊/工作通知推送；修改后立即生效（推送新订单时使用新配置）</span>
-    </div>
-    <div class="card">
-      <h3>通知与管理端地址</h3>
-      <div class="row"><b style="width:130px">管理端地址：</b><input id="stBase" style="width:380px" placeholder="如 https://meal.xxx.com/admin/"></div>
-      <span style="color:#999;font-size:12px">钉钉通知里"点此登录管理端"链接使用该地址；正式环境配置公网 HTTPS 地址</span>
-    </div>
-    <div class="card">
-      <h3>群机器人 Webhook（备用通道，选填）</h3>
-      <div class="row"><b style="width:130px">Webhook：</b><input id="stWebhook" style="width:380px" placeholder="机器人 Webhook 地址，不启用则留空"></div>
-      <div class="row"><b style="width:130px">加签密钥：</b><input id="stWSecret" style="width:320px" type="password" placeholder="留空或保持掩码不变 = 不修改"></div>
-      <span style="color:#999;font-size:12px">机器人单聊/工作通知失败时降级使用；只推群聊场景才需要</span>
-      <div class="row" style="margin-top:12px"><button class="primary" onclick="saveSettings()">保存全部设置</button></div>
-    </div>
-  </div>
-
-  <!-- 高管就餐 -->
-  <div id="tab-exec" style="display:none">
-    <div class="card">
-      <h3>高管名单 <span style="font-weight:400;color:#888;font-size:13px">｜ 到推送时间点自动钉钉提醒确认，确认结果自动生成订单进统计</span></h3>
-      <div class="row">
-        <input id="neName" placeholder="姓名" style="width:100px">
-        <input id="neMobile" placeholder="钉钉手机号" style="width:140px">
-        <input id="neDept" placeholder="部门" style="width:120px">
-        <select id="neMeal" style="width:110px"><option value="lunch">午餐</option><option value="dinner">晚餐</option><option value="breakfast">早餐</option><option value="lunch,dinner">午+晚</option></select>
-        <button class="primary" onclick="addExec()">添加</button>
+      <div class="card">
+        <h3>推送与截止时间 <span class="hint">｜ 按餐别推送：到点只推对应餐别的确认（各餐别独立确认/统计），目标日=明天且为工作日；留空=不推送该餐</span></h3>
+        <div class="row" style="margin-bottom:8px">
+          <b style="width:100px">早餐推送：</b><input id="exPushBreakfast" type="time" style="width:120px">
+          <b style="width:100px;margin-left:12px">午餐推送：</b><input id="exPushLunch" type="time" style="width:120px">
+          <b style="width:100px;margin-left:12px">晚餐推送：</b><input id="exPushDinner" type="time" style="width:120px">
+        </div>
+        <div class="row">
+          <b style="width:100px">封账时间：</b><input id="exDeadline" type="time" style="width:120px">
+          <button class="primary" onclick="saveExecTime()" style="margin-left:12px">保存</button>
+          <span class="hint">封账时间用于确认页提示</span>
+        </div>
+        <div class="row" style="margin-top:10px">
+          <b style="width:110px">取消就餐截止：</b>
+          <span style="font-size:13px;color:#666">早餐</span><input id="exCancelBreakfast" type="time" style="width:105px">
+          <span style="font-size:13px;color:#666">午餐</span><input id="exCancelLunch" type="time" style="width:105px">
+          <span style="font-size:13px;color:#666">晚餐</span><input id="exCancelDinner" type="time" style="width:105px">
+          <span class="hint">确认就餐后超过当天该餐别截止时间，确认页不再显示取消按钮</span>
+        </div>
       </div>
-      <table><thead><tr><th>姓名</th><th>手机号</th><th>部门</th><th>默认餐别</th><th>状态</th><th>操作</th></tr></thead><tbody id="execBody"></tbody></table>
-    </div>
-    <div class="card">
-      <h3>推送时间 <span style="font-weight:400;color:#888;font-size:13px">｜ 按餐别推送：到点只推对应餐别的确认（各餐别独立确认/统计），目标日=明天且为工作日；留空=不推送该餐</span></h3>
-      <div class="row" style="margin-bottom:8px">
-        <b style="width:100px">早餐推送：</b><input id="exPushBreakfast" type="time" style="width:120px">
-        <b style="width:100px;margin-left:12px">午餐推送：</b><input id="exPushLunch" type="time" style="width:120px">
-        <b style="width:100px;margin-left:12px">晚餐推送：</b><input id="exPushDinner" type="time" style="width:120px">
+      <div class="card">
+        <h3>工作日历 <span class="hint">｜ 默认周一~周六上班；点击日期切换 上班/休息，可翻月设置公司节假日</span></h3>
+        <div style="display:flex;gap:10px;align-items:center;margin-bottom:12px">
+          <button onclick="calNav(-1)">← 上一月</button>
+          <b id="calMonth" style="font-size:15px;min-width:90px;text-align:center"></b>
+          <button onclick="calNav(1)">下一月 →</button>
+          <button onclick="calNav(0)">本月</button>
+        </div>
+        <div id="workdayChips" style="display:flex;flex-wrap:wrap;gap:8px"></div>
       </div>
-      <div class="row">
-        <b style="width:100px">封账时间：</b><input id="exDeadline" type="time" style="width:120px">
-        <button class="primary" onclick="saveExecTime()" style="margin-left:12px">保存</button>
-        <span style="color:#999;font-size:12px">封账时间用于确认页提示</span>
-      </div>
-      <div class="row" style="margin-top:10px">
-        <b style="width:110px">取消就餐截止：</b>
-        <span style="font-size:13px;color:#666">早餐</span><input id="exCancelBreakfast" type="time" style="width:105px">
-        <span style="font-size:13px;color:#666">午餐</span><input id="exCancelLunch" type="time" style="width:105px">
-        <span style="font-size:13px;color:#666">晚餐</span><input id="exCancelDinner" type="time" style="width:105px">
-        <span style="color:#999;font-size:12px">确认就餐后超过当天该餐别截止时间，确认页不再显示取消按钮</span>
+      <div class="card">
+        <h3>明日确认状态 <span id="execStatusMeta" class="hint"></span></h3>
+        <table><thead><tr><th>姓名</th><th>手机号</th><th>部门</th><th>各餐别确认状态</th><th>确认时间</th></tr></thead><tbody id="execStatusBody"></tbody></table>
       </div>
     </div>
-    <div class="card">
-      <h3>工作日历 <span style="font-weight:400;color:#888;font-size:13px">｜ 默认周一~周六上班；点击日期切换 上班/休息，可翻月设置公司节假日</span></h3>
-      <div style="display:flex;gap:10px;align-items:center;margin-bottom:12px">
-        <button onclick="calNav(-1)">← 上一月</button>
-        <b id="calMonth" style="font-size:15px;min-width:90px;text-align:center"></b>
-        <button onclick="calNav(1)">下一月 →</button>
-        <button onclick="calNav(0)">本月</button>
-      </div>
-      <div id="workdayChips" style="display:flex;flex-wrap:wrap;gap:8px"></div>
-    </div>
-    <div class="card">
-      <h3>明日确认状态 <span id="execStatusMeta" style="font-weight:400;color:#888;font-size:13px"></span></h3>
-      <table><thead><tr><th>姓名</th><th>手机号</th><th>部门</th><th>各餐别确认状态</th><th>确认时间</th></tr></thead><tbody id="execStatusBody"></tbody></table>
     </div>
   </div>
 </div>
@@ -290,6 +391,7 @@ let routeDel = {};
 let routeDirty = false;   // 地点图片有未保存更改
 
 const $ = id => document.getElementById(id);
+const TAB_TITLE = { dash: '运营看板', orders: '订餐记录', place: '地点与路线', area: '区域与成员', dept: '被访部门', users: '用户管理', settings: '系统设置', exec: '高管就餐' };
 function toast(m) { const el = $('msg'); el.textContent = m; el.style.display = 'block'; setTimeout(() => el.style.display = 'none', 3000); }
 async function api(path, opt = {}) {
   const res = await fetch(path, {
@@ -307,16 +409,24 @@ async function login() {
   token = r.data.token; sessionStorage.setItem('meal_token', token);
   sessionStorage.setItem('meal_role', r.data.role || 'operator');
   sessionStorage.setItem('meal_name', r.data.name || '');
-  $('loginBox').style.display = 'none'; $('main').style.display = 'block';
+  $('loginBox').style.display = 'none'; $('main').style.display = 'flex';
   applyRole(); init();
 }
 function logout() { token = ''; sessionStorage.clear(); location.reload(); }
 function myRole() { return sessionStorage.getItem('meal_role') || 'operator'; }
 
-// 角色可见性：非管理员隐藏配置类标签
+// 顶栏用户信息
+function renderUserChip() {
+  const name = sessionStorage.getItem('meal_name') || '用户';
+  $('userName').textContent = name;
+  $('userAvatar').textContent = name.slice(0, 1).toUpperCase();
+  $('userRole').textContent = myRole() === 'admin' ? '管理员' : '操作员';
+}
+
+// 角色可见性：非管理员隐藏配置类菜单
 function applyRole() {
   const admin = myRole() === 'admin';
-  document.querySelectorAll('.tab[data-admin]').forEach(e => e.style.display = admin ? '' : 'none');
+  document.querySelectorAll('.menu-item[data-admin], .menu-group[data-admin]').forEach(e => e.style.display = admin ? '' : 'none');
 }
 
 function switchTab(t) {
@@ -324,7 +434,8 @@ function switchTab(t) {
     if (!confirm('地点图片有未保存的更改，切换后将丢失。确认继续？')) return;
     routeDirty = false;
   }
-  document.querySelectorAll('.tab').forEach(e => e.classList.toggle('active', e.dataset.tab === t));
+  document.querySelectorAll('.menu-item').forEach(e => e.classList.toggle('active', e.dataset.tab === t));
+  $('pageTitle').textContent = TAB_TITLE[t] || '';
   ['dash', 'orders', 'place', 'area', 'dept', 'users', 'settings', 'exec'].forEach(k => { const el = $('tab-' + k); if (el) el.style.display = k === t ? '' : 'none'; });
   if (t === 'dash') loadDash();
   if (t === 'orders') loadOrders();
@@ -399,7 +510,7 @@ async function loadWorkdays() {
   const weekNames = ['日','一','二','三','四','五','六'];
   $('workdayChips').innerHTML = r.data.list.map(x => {
     const w = weekNames[new Date(+x.d.slice(0,4), +x.d.slice(5,7)-1, +x.d.slice(8,10)).getDay()];
-    return `<button onclick="toggleWorkday('${x.d}',${x.work ? 0 : 1})" style="padding:6px 10px;border-radius:8px;font-size:12px;${x.today ? 'border:2px solid #185FA5;' : ''}${x.work ? 'background:#E6F1FB;color:#185FA5' : 'background:#FBEAEA;color:#A32D2D;text-decoration:line-through'}" title="${x.d} 周${w}">${x.d.slice(5)} 周${w}</button>`;
+    return `<button class="cal-chip" onclick="toggleWorkday('${x.d}',${x.work ? 0 : 1})" style="${x.today ? 'border:2px solid #185FA5;' : ''}${x.work ? 'background:#E6F1FB;color:#185FA5' : 'background:#FBEAEA;color:#A32D2D;text-decoration:line-through'}" title="${x.d} 周${w}">${x.d.slice(5)} 周${w}</button>`;
   }).join('');
 }
 async function toggleWorkday(d, work) {
@@ -564,13 +675,13 @@ async function renderPlaceCards() {
     const imgs = list.filter(x => x.img_path).map(x =>
       `<div class="it"><img src="${x.img_path}"><button class="del" onclick="delImg('${p.code}',${x.id})">×</button></div>`).join('');
     return `<div class="card">
-      <h3>${p.name} <span style="font-weight:400;color:#888;font-size:13px">｜ 人均单价 ¥${p.price ?? 0} <button style="padding:2px 8px" onclick="editPrice(${p.id},'${p.name}',${p.price ?? 0})">改价</button> <button class="danger" style="padding:2px 8px" onclick="delPlace(${p.id})">停用</button></span></h3>
-      <div class="row"><b style="width:90px">如何进入：</b><span style="color:#0f6e56;font-size:12px" id="hint_${p.code}">（输入后自动保存）</span></div>
+      <h3>${p.name} <span class="hint">｜ 人均单价 ¥${p.price ?? 0} <button style="padding:2px 8px" onclick="editPrice(${p.id},'${p.name}',${p.price ?? 0})">改价</button> <button class="danger" style="padding:2px 8px" onclick="delPlace(${p.id})">停用</button></span></h3>
+      <div class="row"><b style="width:90px">如何进入：</b><span class="hint" style="color:var(--success)" id="hint_${p.code}">（输入后自动保存）</span></div>
       <textarea id="desc_${p.code}" data-orig="${(main?.entry_desc || '').replace(/"/g, '&quot;')}" onblur="autoSaveDesc('${p.code}')" placeholder="如：A区东门进入，直行至2号楼，乘电梯至3楼">${main?.entry_desc || ''}</textarea>
       <div class="row" style="margin-top:10px"><b style="width:90px">地点图片：</b><div class="imgs" id="imgs_${p.code}">${imgs}</div></div>
       <div class="row"><input type="file" id="file_${p.code}" accept="image/*" multiple style="border:none" onchange="routeDirty=true"> <button class="primary" onclick="saveRoute('${p.code}')">保存图片更改</button></div>
     </div>`;
-  }).join('') + '<div style="color:#999;padding:0 8px">停用地点不影响历史订单展示。</div>';
+  }).join('') + '<div class="hint" style="padding:0 8px">停用地点不影响历史订单展示。</div>';
 }
 async function addPlace() {
   const v = $('newPlace').value.trim();
@@ -732,7 +843,6 @@ function exportExcel() {
   location.href = '/api/admin/orders/export?' + q.toString() + '&_t=' + token;
 }
 
-// ===== 统计 =====
 // ===== 区域与成员 =====
 let areaMap = {};   // id -> name
 async function loadAreas() {
@@ -742,7 +852,7 @@ async function loadAreas() {
   $('areaCards').innerHTML = areas.map(a => {
     const mem = members.filter(m => m.area_id === a.id);
     return `<div class="card">
-      <h3>📍 ${a.name} <span style="font-weight:400;color:#888;font-size:13px">（${mem.length} 名成员） <button class="danger" style="padding:2px 8px" onclick="delArea(${a.id})">停用区域</button></span></h3>
+      <h3>📍 ${a.name} <span class="hint">（${mem.length} 名成员） <button class="danger" style="padding:2px 8px" onclick="delArea(${a.id})">停用区域</button></span></h3>
       <table><thead><tr><th>成员姓名</th><th>钉钉手机号</th><th>操作</th></tr></thead><tbody>
         ${mem.map(m => `<tr><td>${m.name}</td><td>${m.dingtalk_mobile}</td><td><button class="danger" style="padding:2px 8px" onclick="delMember(${m.id},${a.id})">移除</button></td></tr>`).join('') || '<tr><td colspan="3" style="color:#999">暂无成员，提交的订单将不会触发通知</td></tr>'}
       </tbody></table>
@@ -791,13 +901,14 @@ async function addDept() {
 async function delDept(i) { depts.splice(i, 1); await api('/api/admin/dept', { method: 'POST', body: { list: depts } }); loadDepts(); }
 
 async function init() {
+  renderUserChip();
   await loadPlaces();
   await loadDash();
   const oid = new URLSearchParams(location.search).get('order');
   if (oid) focusOrder(oid);
 }
 if (token) {
-  $('loginBox').style.display = 'none'; $('main').style.display = 'block';
+  $('loginBox').style.display = 'none'; $('main').style.display = 'flex';
   applyRole(); init();
 }
 </script>
