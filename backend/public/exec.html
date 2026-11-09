@@ -54,11 +54,14 @@ async function load() {
       ${['lunch','breakfast','dinner'].map(m => `<option value="${m}" ${d.meal_type.includes(m) ? 'selected' : ''}>${MEAL[m]}</option>`).join('')}
     </select></div>
     <div class="row"><label>人数：</label><input id="hc" type="number" min="1" max="99" value="${d.headcount}"></div>
-    <div class="btns">
-      <button class="yes" onclick="send('yes')">确认就餐</button>
-      <button class="no" onclick="send('no')">不就餐</button>
-    </div>
-    ${d.status !== 'pending' ? `<div class="btns" style="margin-top:10px"><button class="cancel" onclick="send('cancel')">取消本次确认（有变更时使用）</button></div>` : ''}
+    ${d.status === 'pending'
+      ? `<div class="btns">
+          <button class="yes" onclick="send('yes')">确认就餐</button>
+          <button class="no" onclick="send('no')">不就餐</button>
+        </div>`
+      : d.status === 'yes'
+        ? `<div class="btns"><button class="cancel" style="color:#a32d2d;border-color:#d9a0a0" onclick="send('cancel')">取消就餐（有变更时使用）</button></div>`
+        : `<div class="btns"><button class="yes" onclick="send('yes')">确认就餐</button></div>`}
     <div class="tip">确认结果将自动计入就餐统计；封账前可随时修改或取消。</div>`;
 }
 
