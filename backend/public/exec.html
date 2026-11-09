@@ -20,6 +20,7 @@
   .yes { background: #0f6e56; color: #fff; }
   .no { background: #fff; color: #a32d2d; border: 1px solid #d9a0a0; }
   .cancel { background: #fff; color: #666; border: 1px solid #ccc; font-weight: 400; }
+  .cancel-solid { background: #b23a3a; color: #fff; }
   .result { text-align: center; padding: 20px 0; font-size: 16px; font-weight: 600; }
   .result.ok { color: #0f6e56; }
   .result.err { color: #a32d2d; }
@@ -61,7 +62,7 @@ async function load() {
         </div>`
       : d.status === 'yes'
         ? (d.can_cancel
-          ? `<div class="btns"><button class="no" onclick="send('cancel')">取消就餐（${d.cancel_deadline} 前可取消）</button></div>`
+          ? `<div class="btns"><button class="cancel-solid" onclick="send('cancel')">取消就餐（${d.cancel_deadline} 前可取消）</button></div>`
           : `<div style="background:#fdf3f3;border:1px solid #e8c8c8;border-radius:10px;padding:12px;color:#a32d2d;font-size:13.5px;text-align:center">已超过取消截止时间（${d.cancel_deadline}），如需变更请联系管理员</div>`)
         : `<div class="btns"><button class="yes" onclick="send('yes')">确认就餐</button></div>`}
     <div class="tip">确认结果将自动计入就餐统计；封账前可随时修改或取消。</div>`;
