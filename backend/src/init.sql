@@ -119,3 +119,40 @@ INSERT IGNORE INTO meal_config (cfg_key, cfg_value) VALUES
 INSERT IGNORE INTO meal_route_map (place, entry_desc, sort) VALUES
   ('canteen', '', 0),
   ('executive', '', 0);
+
+-- 高管就餐确认体系
+CREATE TABLE IF NOT EXISTS meal_exec (
+  id BIGINT AUTO_INCREMENT PRIMARY KEY,
+  name VARCHAR(50) NOT NULL COMMENT '姓名',
+  mobile VARCHAR(20) NOT NULL COMMENT '钉钉手机号',
+  dept VARCHAR(50) DEFAULT '' COMMENT '所属部门',
+  meal_type VARCHAR(32) NOT NULL DEFAULT 'lunch' COMMENT '默认餐别',
+  place VARCHAR(20) NOT NULL DEFAULT 'executive' COMMENT '默认就餐地点 code',
+  enabled TINYINT(1) NOT NULL DEFAULT 1,
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+) COMMENT '高管就餐名单';
+
+CREATE TABLE IF NOT EXISTS meal_workday (
+  d DATE PRIMARY KEY,
+  work TINYINT(1) NOT NULL COMMENT '1=上班 0=休息（覆盖默认周一~周六）',
+  updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+) COMMENT '公司工作日历（仅存与默认不同的覆盖项）';
+
+CREATE TABLE IF NOT EXISTS meal_exec_confirm (
+  id BIGINT AUTO_INCREMENT PRIMARY KEY,
+  exec_id BIGINT NOT NULL,
+  d DATE NOT NULL,
+  status VARCHAR(10) NOT NULL DEFAULT 'pending' COMMENT 'yes/no/pending',
+  meal_type VARCHAR(32) DEFAULT 'lunch',
+  headcount INT DEFAULT 1,
+  order_id BIGINT DEFAULT NULL COMMENT '确认就餐生成的订单',
+  confirm_at DATETIME DEFAULT NULL,
+  UNIQUE KEY uk_exec_date (exec_id, d)
+) COMMENT '高管就餐确认记录';
+
+CREATE TABLE IF NOT EXISTS meal_exec_push (
+  d DATE PRIMARY KEY,
+  target_date DATE NOT NULL COMMENT '提醒的目标就餐日',
+  pushed_at DATETIME NOT NULL,
+  stats VARCHAR(200) DEFAULT ''
+) COMMENT '高管就餐推送日志（防重复推送）';

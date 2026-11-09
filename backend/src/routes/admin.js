@@ -383,7 +383,7 @@ router.post('/dept', auth, requireAdmin, async (req, res) => {
 });
 
 // ===== 系统设置（仅管理员）：钉钉应用信息等，推广部署时每家公司在界面各自配置 =====
-const SETTING_KEYS = ['dingtalk_appkey', 'dingtalk_appsecret', 'dingtalk_agent_id', 'dingtalk_webhook', 'dingtalk_secret', 'admin_base_url'];
+const SETTING_KEYS = ['dingtalk_appkey', 'dingtalk_appsecret', 'dingtalk_agent_id', 'dingtalk_webhook', 'dingtalk_secret', 'admin_base_url', 'exec_push_time', 'exec_deadline'];
 const SECRET_KEYS = ['dingtalk_appsecret', 'dingtalk_secret'];
 function maskSecret(v) {
   if (!v) return '';
@@ -408,6 +408,61 @@ router.post('/settings', auth, requireAdmin, async (req, res) => {
   }
   invalidateConfigCache();
   res.json({ code: 0 });
+});
+
+// ===== 高管就餐（仅管理员维护） =====
+const { isWorkday, fmtD } = require('../services/exec-push');
+
+router.get('/execs', auth, requireAdmin, async (req, res) => {
+  const [rows] = await pool.query('SELECT * FROM meal_exec ORDER BY id');
+  res.json({ code: 0, data: rows });
+});
+router.post('/execs', auth, requireAdmin, async (req, res) => {
+  const { name, mobile, dept, meal_type, place } = req.body;
+  if (!name?.trim()) return res.json({ code: 400, msg: '姓名必填' });
+  if (!/^1[3-9]\d{9}$/.test(mobile || '')) return res.json({ code: 400, msg: '钉钉手机号格式不正确' });
+  const mt = (meal_type || 'lunch').split(',').filter(m => ['breakfast', 'lunch', 'dinner'].includes(m)).join(',') || 'lunch';
+  await pool.query('INSERT INTO meal_exec (name, mobile, dept, meal_type, place) VALUES (?,?,?,?,?)',
+    [name.trim(), mobile, dept || '', mt, place || 'executive']);
+  res.json({ code: 0 });
+});
+router.post('/execs/:id/toggle', auth, requireAdmin, async (req, res) => {
+  await pool.query('UPDATE meal_exec SET enabled = NOT enabled WHERE id=?', [req.params.id]);
+  res.json({ code: 0 });
+});
+router.delete('/execs/:id', auth, requireAdmin, async (req, res) => {
+  await pool.query('DELETE FROM meal_exec WHERE id=?', [req.params.id]);
+  res.json({ code: 0 });
+});
+
+// 工作日历：未来 30 天（默认周一~周六上班，meal_workday 覆盖项叠加）
+router.get('/workdays', auth, requireAdmin, async (req, res) => {
+  const list = [];
+  const now = new Date();
+  for (let i = 0; i < 30; i++) {
+    const d = fmtD(new Date(now.getTime() + i * 86400000));
+    list.push({ d, work: await isWorkday(d), today: i === 0 });
+  }
+  res.json({ code: 0, data: list });
+});
+router.post('/workdays', auth, requireAdmin, async (req, res) => {
+  const { d, work } = req.body;
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(d || '')) return res.json({ code: 400, msg: '日期格式错误' });
+  await pool.query('INSERT INTO meal_workday (d, work) VALUES (?,?) ON DUPLICATE KEY UPDATE work=VALUES(work)', [d, work ? 1 : 0]);
+  res.json({ code: 0 });
+});
+
+// 高管确认状态（默认查明天的目标日）
+router.get('/exec-status', auth, requireAdmin, async (req, res) => {
+  const d = req.query.d || fmtD(new Date(Date.now() + 86400000));
+  const [rows] = await pool.query(
+    `SELECT e.id, e.name, e.mobile, e.dept, e.enabled,
+            c.status, c.meal_type, c.headcount, c.confirm_at
+     FROM meal_exec e LEFT JOIN meal_exec_confirm c ON c.exec_id=e.id AND c.d=?
+     ORDER BY e.id`, [d]
+  );
+  const [push] = await pool.query('SELECT * FROM meal_exec_push WHERE target_date=?', [d]);
+  res.json({ code: 0, data: { date: d, isWorkday: await isWorkday(d), rows, push: push[0] || null } });
 });
 
 // 路线图维护

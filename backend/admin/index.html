@@ -96,6 +96,7 @@ textarea { width: 100%; min-height: 60px; padding: 9px 12px; border: 1px solid #
     <div class="tab" data-tab="dept" onclick="switchTab('dept')" data-admin="1">被访部门</div>
     <div class="tab" data-tab="users" onclick="switchTab('users')" data-admin="1">用户管理</div>
     <div class="tab" data-tab="settings" onclick="switchTab('settings')" data-admin="1">系统设置</div>
+    <div class="tab" data-tab="exec" onclick="switchTab('exec')" data-admin="1">高管就餐</div>
   </div>
 
   <!-- 看板 -->
@@ -140,10 +141,6 @@ textarea { width: 100%; min-height: 60px; padding: 9px 12px; border: 1px solid #
       <button class="danger" onclick="batchReject()">拒绝选中</button>
       <button onclick="exportExcel()">导出 Excel</button>
       <span id="selCount" style="color:#888"></span>
-    </div>
-    <div class="sum-wrap" id="summaryBox" style="display:none">
-      <h3>📊 分配统计</h3>
-      <table><thead><tr id="sumHead"></tr></thead><tbody id="sumBody"></tbody></table>
     </div>
     <table>
       <thead><tr>
@@ -233,6 +230,38 @@ textarea { width: 100%; min-height: 60px; padding: 9px 12px; border: 1px solid #
       <div class="row" style="margin-top:12px"><button class="primary" onclick="saveSettings()">保存全部设置</button></div>
     </div>
   </div>
+
+  <!-- 高管就餐 -->
+  <div id="tab-exec" style="display:none">
+    <div class="card">
+      <h3>高管名单 <span style="font-weight:400;color:#888;font-size:13px">｜ 到推送时间点自动钉钉提醒确认，确认结果自动生成订单进统计</span></h3>
+      <div class="row">
+        <input id="neName" placeholder="姓名" style="width:100px">
+        <input id="neMobile" placeholder="钉钉手机号" style="width:140px">
+        <input id="neDept" placeholder="部门" style="width:120px">
+        <select id="neMeal" style="width:110px"><option value="lunch">午餐</option><option value="dinner">晚餐</option><option value="breakfast">早餐</option><option value="lunch,dinner">午+晚</option></select>
+        <button class="primary" onclick="addExec()">添加</button>
+      </div>
+      <table><thead><tr><th>姓名</th><th>手机号</th><th>部门</th><th>默认餐别</th><th>状态</th><th>操作</th></tr></thead><tbody id="execBody"></tbody></table>
+    </div>
+    <div class="card">
+      <h3>推送时间 <span style="font-weight:400;color:#888;font-size:13px">｜ 到点自动触发，每天只推一次；目标日=明天且为工作日</span></h3>
+      <div class="row">
+        <b style="width:90px">推送时间：</b><input id="exPushTime" type="time" style="width:120px">
+        <b style="width:90px">封账时间：</b><input id="exDeadline" type="time" style="width:120px">
+        <button class="primary" onclick="saveExecTime()">保存</button>
+        <span style="color:#999;font-size:12px">推送时间到点后向名单内全员发钉钉确认链接；封账时间仅用于页面上提示</span>
+      </div>
+    </div>
+    <div class="card">
+      <h3>工作日历 <span style="font-weight:400;color:#888;font-size:13px">｜ 默认周一~周六上班；点击切换覆盖公司节假日安排</span></h3>
+      <div id="workdayChips" style="display:flex;flex-wrap:wrap;gap:8px"></div>
+    </div>
+    <div class="card">
+      <h3>明日确认状态 <span id="execStatusMeta" style="font-weight:400;color:#888;font-size:13px"></span></h3>
+      <table><thead><tr><th>姓名</th><th>手机号</th><th>部门</th><th>确认状态</th><th>餐别/人数</th><th>确认时间</th></tr></thead><tbody id="execStatusBody"></tbody></table>
+    </div>
+  </div>
 </div>
 
 <script>
@@ -279,14 +308,72 @@ function switchTab(t) {
     routeDirty = false;
   }
   document.querySelectorAll('.tab').forEach(e => e.classList.toggle('active', e.dataset.tab === t));
-  ['dash', 'orders', 'place', 'area', 'dept', 'users', 'settings'].forEach(k => { const el = $('tab-' + k); if (el) el.style.display = k === t ? '' : 'none'; });
+  ['dash', 'orders', 'place', 'area', 'dept', 'users', 'settings', 'exec'].forEach(k => { const el = $('tab-' + k); if (el) el.style.display = k === t ? '' : 'none'; });
   if (t === 'dash') loadDash();
-  if (t === 'orders') { loadOrders(); loadSummary(); }
+  if (t === 'orders') loadOrders();
   if (t === 'place') renderPlaceCards();
   if (t === 'area') loadAreas();
   if (t === 'dept') loadDepts();
   if (t === 'users') loadUsers();
   if (t === 'settings') loadSettings();
+  if (t === 'exec') { loadExecs(); loadExecStatus(); loadExecTime(); loadWorkdays(); }
+}
+
+// ===== 高管就餐 =====
+async function loadExecs() {
+  const r = await api('/api/admin/execs');
+  if (r.code !== 0) return toast(r.msg);
+  $('execBody').innerHTML = r.data.map(x => `<tr>
+    <td><b>${x.name}</b></td><td>${x.mobile}</td><td>${x.dept || '-'}</td>
+    <td>${x.meal_type.split(',').map(m => ({breakfast:'早',lunch:'午',dinner:'晚'}[m] || m)).join('+')}</td>
+    <td>${x.enabled ? '<span class="tag assigned">启用</span>' : '<span class="tag rejected">停用</span>'}</td>
+    <td><button style="padding:2px 8px" onclick="toggleExec(${x.id})">${x.enabled ? '停用' : '启用'}</button>
+        <button class="danger" style="padding:2px 8px" onclick="delExec(${x.id},'${x.name}')">删除</button></td>
+  </tr>`).join('') || '<tr><td colspan="6" style="text-align:center;color:#999">名单为空，请添加</td></tr>';
+}
+async function addExec() {
+  const r = await api('/api/admin/execs', { method: 'POST', body: { name: $('neName').value.trim(), mobile: $('neMobile').value.trim(), dept: $('neDept').value.trim(), meal_type: $('neMeal').value } });
+  if (r.code === 0) { ['neName','neMobile','neDept'].forEach(i => $(i).value = ''); loadExecs(); } else toast(r.msg);
+}
+async function toggleExec(id) { await api(`/api/admin/execs/${id}/toggle`, { method: 'POST' }); loadExecs(); }
+async function delExec(id, name) { if (!confirm(`删除高管「${name}」？`)) return; await api(`/api/admin/execs/${id}`, { method: 'DELETE' }); loadExecs(); }
+
+async function loadExecTime() {
+  const r = await api('/api/admin/settings');
+  if (r.code !== 0) return;
+  $('exPushTime').value = r.data.exec_push_time || '15:00';
+  $('exDeadline').value = r.data.exec_deadline || '20:00';
+}
+async function saveExecTime() {
+  const r = await api('/api/admin/settings', { method: 'POST', body: { exec_push_time: $('exPushTime').value, exec_deadline: $('exDeadline').value } });
+  r.code === 0 ? toast('推送时间已保存') : toast(r.msg);
+}
+
+async function loadWorkdays() {
+  const r = await api('/api/admin/workdays');
+  if (r.code !== 0) return;
+  $('workdayChips').innerHTML = r.data.map(x => {
+    const w = ['日','一','二','三','四','五','六'][new Date(x.d + 'T00:00:00+08:00').getDay()];
+    return `<button onclick="toggleWorkday('${x.d}',${x.work ? 0 : 1})" style="padding:6px 10px;border-radius:8px;font-size:12px;${x.today ? 'border:2px solid #185FA5;' : ''}${x.work ? 'background:#E6F1FB;color:#185FA5' : 'background:#FBEAEA;color:#A32D2D;text-decoration:line-through'}">${x.d.slice(5)} 周${w}</button>`;
+  }).join('');
+}
+async function toggleWorkday(d, work) {
+  const r = await api('/api/admin/workdays', { method: 'POST', body: { d, work: !!work } });
+  if (r.code === 0) loadWorkdays();
+}
+
+async function loadExecStatus() {
+  const r = await api('/api/admin/exec-status');
+  if (r.code !== 0) return toast(r.msg);
+  const d = r.data;
+  $('execStatusMeta').textContent = `｜ ${d.date} ${d.isWorkday ? '（工作日）' : '（非工作日）'} ｜ 推送：${d.push ? d.push.stats || '已推送' : '未推送'}`;
+  const S = { yes: '<span class="tag assigned">就餐</span>', no: '<span class="tag rejected">不就餐</span>', pending: '<span style="color:#999">未确认</span>' };
+  $('execStatusBody').innerHTML = d.rows.map(x => `<tr>
+    <td><b>${x.name}</b>${x.enabled ? '' : ' <span class="tag rejected">停用</span>'}</td><td>${x.mobile}</td><td>${x.dept || '-'}</td>
+    <td>${S[x.status || 'pending']}</td>
+    <td>${x.status === 'yes' ? `${(x.meal_type||'').split(',').map(m => ({breakfast:'早',lunch:'午',dinner:'晚'}[m]||m)).join('+')} · ${x.headcount} 人` : '-'}</td>
+    <td>${x.confirm_at ? x.confirm_at.slice(5, 16) : '-'}</td>
+  </tr>`).join('') || '<tr><td colspan="6" style="text-align:center;color:#999">名单为空</td></tr>';
 }
 
 // ===== 系统设置 =====
@@ -483,7 +570,7 @@ async function saveRoute(place) {
 }
 
 // ===== 订单 =====
-async function reloadOrders() { await loadOrders(); await loadSummary(); }
+async function reloadOrders() { await loadOrders(); }
 let ordPage = 1;
 function ordSize() { const s = document.getElementById('fSize'); return +(s?.value) || 20; }
 async function loadOrders(opts = {}) {
@@ -590,26 +677,6 @@ function exportExcel() {
 }
 
 // ===== 统计 =====
-async function loadSummary() {
-  const q = new URLSearchParams();
-  if ($('fDate').value) q.set('date', $('fDate').value);
-  const r = await api('/api/admin/orders/summary?' + q.toString());
-  const { rows, pending, places: pn } = r.data;
-  if (!rows.length && !pending.length) { $('summaryBox').style.display = 'none'; return; }
-  $('summaryBox').style.display = 'block';
-  const showDate = !$('fDate').value;
-  $('sumHead').innerHTML = `${showDate ? '<th>日期</th>' : ''}<th>地点</th><th>被访部门</th><th>人数</th><th>单数</th><th>预计金额</th><th>真实金额</th>`;
-  let totalHc = 0, totalCnt = 0, totalEst = 0, totalActual = 0;
-  const body = rows.map(x => {
-    totalHc += +x.hc; totalCnt += +x.cnt; totalEst += +x.est; totalActual += +x.actual;
-    return `<tr>${showDate ? `<td>${x.meal_date}</td>` : ''}<td>${pn[x.place] || x.place || '-'}</td><td>${x.dept}</td><td><b>${x.hc}</b></td><td>${x.cnt}</td><td>¥${x.est}</td><td>${+x.actual ? '¥' + x.actual : '-'}</td></tr>`;
-  }).join('');
-  const pend = pending.map(x =>
-    `<tr class="total-row">${showDate ? `<td>${x.meal_date}</td>` : ''}<td>⏳ 待分配</td><td>—</td><td>${x.hc}</td><td>${x.cnt}</td><td>—</td><td>—</td></tr>`).join('');
-  $('sumBody').innerHTML = body + pend +
-    `<tr class="total-row"><td colspan="${showDate ? 4 : 3}">已分配合计</td><td>${totalHc}</td><td>${totalCnt}</td><td>¥${totalEst.toFixed(2)}</td><td>${totalActual ? '¥' + totalActual.toFixed(2) : '-'}</td></tr>`;
-}
-
 // ===== 区域与成员 =====
 let areaMap = {};   // id -> name
 async function loadAreas() {

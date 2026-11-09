@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>高管就餐确认</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: -apple-system, "PingFang SC", sans-serif; background: #f4f6f9; color: #2b3445; font-size: 15px; }
+  .box { max-width: 420px; margin: 60px auto; background: #fff; border-radius: 14px; padding: 30px 26px; box-shadow: 0 2px 12px rgba(30,50,80,.08); }
+  h2 { font-size: 19px; margin-bottom: 6px; }
+  .sub { color: #7a8598; font-size: 13.5px; margin-bottom: 18px; }
+  .info { background: #f7f9fc; border-radius: 10px; padding: 14px 16px; margin-bottom: 18px; font-size: 14px; line-height: 2; }
+  .info b { color: #185fa5; }
+  .row { display: flex; gap: 12px; margin-bottom: 16px; align-items: center; }
+  .row label { width: 64px; color: #666; font-size: 13.5px; }
+  select, input { flex: 1; padding: 9px 12px; border: 1px solid #dfe5ee; border-radius: 8px; font-size: 14px; }
+  .btns { display: flex; gap: 12px; }
+  button { flex: 1; padding: 13px 0; border: none; border-radius: 10px; font-size: 15px; font-weight: 600; cursor: pointer; }
+  .yes { background: #0f6e56; color: #fff; }
+  .no { background: #fff; color: #a32d2d; border: 1px solid #d9a0a0; }
+  .result { text-align: center; padding: 20px 0; font-size: 16px; font-weight: 600; }
+  .result.ok { color: #0f6e56; }
+  .result.err { color: #a32d2d; }
+  .tip { margin-top: 14px; color: #999; font-size: 12.5px; text-align: center; }
+</style>
+</head>
+<body>
+<div class="box" id="app">
+  <h2>高管就餐确认</h2>
+  <div class="sub" id="sub">加载中...</div>
+  <div id="content"></div>
+</div>
+<script>
+const qs = new URLSearchParams(location.search);
+const E = qs.get('e'), D = qs.get('d'), T = qs.get('t');
+const MEAL = { breakfast: '早餐', lunch: '午餐', dinner: '晚餐' };
+
+async function load() {
+  const r = await fetch(`/api/exec/page-data?e=${E}&d=${D}&t=${T}`).then(r => r.json());
+  if (r.code !== 0) { document.getElementById('sub').textContent = ''; renderMsg(r.msg || '链接无效', true); return; }
+  const d = r.data;
+  const week = ['日','一','二','三','四','五','六'][new Date(D + 'T00:00:00+08:00').getDay()];
+  document.getElementById('sub').textContent = `${d.name}${d.dept ? ' · ' + d.dept : ''}`;
+  const statusText = { pending: '尚未确认', yes: '已确认就餐', no: '已确认不就餐' }[d.status];
+  document.getElementById('content').innerHTML = `
+    <div class="info">
+      就餐日期：<b>${D}（周${week}）</b><br>
+      地点：<b>${d.place_name}</b><br>
+      当前状态：<b>${statusText}</b> ｜ 封账时间：${d.deadline}
+    </div>
+    <div class="row"><label>餐别：</label><select id="meal">
+      ${['lunch','breakfast','dinner'].map(m => `<option value="${m}" ${d.meal_type.includes(m) ? 'selected' : ''}>${MEAL[m]}</option>`).join('')}
+    </select></div>
+    <div class="row"><label>人数：</label><input id="hc" type="number" min="1" max="99" value="${d.headcount}"></div>
+    <div class="btns">
+      <button class="yes" onclick="send('yes')">确认就餐</button>
+      <button class="no" onclick="send('no')">不就餐</button>
+    </div>
+    <div class="tip">确认结果将自动计入就餐统计；封账前可随时修改。</div>`;
+}
+
+async function send(status) {
+  const meal = document.getElementById('meal').value;
+  const hc = +document.getElementById('hc').value || 1;
+  const r = await fetch('/api/exec/confirm', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ e: E, d: D, t: T, status, meal_type: meal, headcount: hc }) }).then(r => r.json());
+  renderMsg(r.msg || (r.code === 0 ? '已提交' : '提交失败'), r.code !== 0, true);
+  if (r.code === 0) setTimeout(load, 1200);
+}
+
+function renderMsg(text, isErr, keepSub) {
+  if (!keepSub) document.getElementById('sub').textContent = '';
+  document.getElementById('content').innerHTML = `<div class="result ${isErr ? 'err' : 'ok'}">${text}</div>`;
+}
+
+load();
+</script>
+</body>
+</html>

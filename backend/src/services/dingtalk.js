@@ -212,4 +212,4 @@ async function notifyAssignSummary(date) {
   return sendDingtalkMarkdown('订餐分配汇总', text);
 }
 
-module.exports = { notifyNewOrder, notifyAssignSummary };
+module.exports = { notifyNewOrder, notifyAssignSummary, sendDingtalkMarkdown };
