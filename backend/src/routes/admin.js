@@ -460,14 +460,10 @@ router.post('/workdays', auth, requireAdmin, async (req, res) => {
 // 高管确认状态（默认查明天的目标日）
 router.get('/exec-status', auth, requireAdmin, async (req, res) => {
   const d = req.query.d || fmtD(new Date(Date.now() + 86400000));
-  const [rows] = await pool.query(
-    `SELECT e.id, e.name, e.mobile, e.dept, e.enabled,
-            c.status, c.meal_type, c.headcount, c.confirm_at
-     FROM meal_exec e LEFT JOIN meal_exec_confirm c ON c.exec_id=e.id AND c.d=?
-     ORDER BY e.id`, [d]
-  );
-  const [push] = await pool.query('SELECT * FROM meal_exec_push WHERE target_date=?', [d]);
-  res.json({ code: 0, data: { date: d, isWorkday: await isWorkday(d), rows, push: push[0] || null } });
+  const [execs] = await pool.query('SELECT id, name, mobile, dept, meal_type, enabled FROM meal_exec ORDER BY id');
+  const [cfs] = await pool.query('SELECT exec_id, meal_type, status, headcount, confirm_at FROM meal_exec_confirm WHERE d=?', [d]);
+  const [pushes] = await pool.query('SELECT * FROM meal_exec_push WHERE target_date=?', [d]);
+  res.json({ code: 0, data: { date: d, isWorkday: await isWorkday(d), execs, confirms: cfs, pushes } });
 });
 
 // 路线图维护

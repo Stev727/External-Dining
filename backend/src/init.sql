@@ -143,18 +143,19 @@ CREATE TABLE IF NOT EXISTS meal_exec_confirm (
   exec_id BIGINT NOT NULL,
   d DATE NOT NULL,
   status VARCHAR(10) NOT NULL DEFAULT 'pending' COMMENT 'yes/no/pending',
-  meal_type VARCHAR(32) DEFAULT 'lunch',
+  meal_type VARCHAR(32) DEFAULT 'lunch' COMMENT '单餐别',
   headcount INT DEFAULT 1,
   order_id BIGINT DEFAULT NULL COMMENT '确认就餐生成的订单',
   confirm_at DATETIME DEFAULT NULL,
-  UNIQUE KEY uk_exec_date (exec_id, d)
-) COMMENT '高管就餐确认记录';
+  UNIQUE KEY uk_exec_date_meal (exec_id, d, meal_type)
+) COMMENT '高管就餐确认记录（按餐别独立）';
 
 CREATE TABLE IF NOT EXISTS meal_exec_push (
   d DATE NOT NULL,
   push_time VARCHAR(10) NOT NULL DEFAULT '' COMMENT '触发时间点或 manual',
+  target_meal VARCHAR(10) NOT NULL DEFAULT '' COMMENT '推送餐别 breakfast/lunch/dinner',
   target_date DATE NOT NULL COMMENT '提醒的目标就餐日',
   pushed_at DATETIME NOT NULL,
   stats VARCHAR(200) DEFAULT '',
-  PRIMARY KEY (d, push_time)
-) COMMENT '高管就餐推送日志（按天+时间点防重复）';
+  PRIMARY KEY (d, push_time, target_meal)
+) COMMENT '高管就餐推送日志（按天+时间点+餐别防重复）';

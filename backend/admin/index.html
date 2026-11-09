@@ -245,12 +245,15 @@ textarea { width: 100%; min-height: 60px; padding: 9px 12px; border: 1px solid #
       <table><thead><tr><th>姓名</th><th>手机号</th><th>部门</th><th>默认餐别</th><th>状态</th><th>操作</th></tr></thead><tbody id="execBody"></tbody></table>
     </div>
     <div class="card">
-      <h3>推送时间 <span style="font-weight:400;color:#888;font-size:13px">｜ 每天可设多个时间点，到点自动触发；第 2 个起仅提醒未确认人员；目标日=明天且为工作日</span></h3>
-      <div id="pushTimeRows" style="display:flex;flex-direction:column;gap:8px;margin-bottom:10px"></div>
+      <h3>推送时间 <span style="font-weight:400;color:#888;font-size:13px">｜ 按餐别推送：到点只推对应餐别的确认（各餐别独立确认/统计），目标日=明天且为工作日；留空=不推送该餐</span></h3>
+      <div class="row" style="margin-bottom:8px">
+        <b style="width:100px">早餐推送：</b><input id="exPushBreakfast" type="time" style="width:120px">
+        <b style="width:100px;margin-left:12px">午餐推送：</b><input id="exPushLunch" type="time" style="width:120px">
+        <b style="width:100px;margin-left:12px">晚餐推送：</b><input id="exPushDinner" type="time" style="width:120px">
+      </div>
       <div class="row">
-        <button onclick="addPushTime()">＋ 添加时间点</button>
-        <b style="width:90px;margin-left:12px">封账时间：</b><input id="exDeadline" type="time" style="width:120px">
-        <button class="primary" onclick="saveExecTime()">保存</button>
+        <b style="width:100px">封账时间：</b><input id="exDeadline" type="time" style="width:120px">
+        <button class="primary" onclick="saveExecTime()" style="margin-left:12px">保存</button>
         <span style="color:#999;font-size:12px">封账时间用于确认页提示</span>
       </div>
       <div class="row" style="margin-top:10px">
@@ -273,7 +276,7 @@ textarea { width: 100%; min-height: 60px; padding: 9px 12px; border: 1px solid #
     </div>
     <div class="card">
       <h3>明日确认状态 <span id="execStatusMeta" style="font-weight:400;color:#888;font-size:13px"></span></h3>
-      <table><thead><tr><th>姓名</th><th>手机号</th><th>部门</th><th>确认状态</th><th>餐别/人数</th><th>确认时间</th></tr></thead><tbody id="execStatusBody"></tbody></table>
+      <table><thead><tr><th>姓名</th><th>手机号</th><th>部门</th><th>各餐别确认状态</th><th>确认时间</th></tr></thead><tbody id="execStatusBody"></tbody></table>
     </div>
   </div>
 </div>
@@ -355,31 +358,22 @@ async function delExec(id, name) { if (!confirm(`删除高管「${name}」？`))
 async function loadExecTime() {
   const r = await api('/api/admin/settings');
   if (r.code !== 0) return;
-  let times = [];
-  try { times = JSON.parse(r.data.exec_push_times || '[]'); } catch (e) { /* ignore */ }
-  if (!times.length && r.data.exec_push_time) times = [r.data.exec_push_time];
-  pushTimes = times.length ? times : ['11:00', '17:00'];
+  let pm = {};
+  try { pm = JSON.parse(r.data.exec_push_times || '{}'); } catch (e) { /* ignore */ }
+  if (Array.isArray(pm)) pm = { lunch: pm[0] || '', dinner: pm[1] || '' }; // 兼容旧数组格式
+  $('exPushBreakfast').value = pm.breakfast || '';
+  $('exPushLunch').value = pm.lunch || '11:00';
+  $('exPushDinner').value = pm.dinner || '17:00';
   $('exDeadline').value = r.data.exec_deadline || '20:00';
   let cd = {};
   try { cd = JSON.parse(r.data.exec_cancel_deadline || '{}'); } catch (e) { /* ignore */ }
   $('exCancelBreakfast').value = cd.breakfast || '08:30';
   $('exCancelLunch').value = cd.lunch || '11:30';
   $('exCancelDinner').value = cd.dinner || '18:30';
-  renderPushTimes();
 }
-let pushTimes = [];
-function renderPushTimes() {
-  $('pushTimeRows').innerHTML = pushTimes.map((t, i) =>
-    `<div class="row" style="margin-bottom:0"><b style="width:90px">时间点 ${i + 1}：</b>
-     <input type="time" style="width:120px" value="${t}" onchange="pushTimes[${i}]=this.value">
-     ${pushTimes.length > 1 ? `<button class="danger" onclick="pushTimes.splice(${i},1);renderPushTimes()">删除</button>` : ''}</div>`).join('');
-}
-function addPushTime() { pushTimes.push('12:00'); renderPushTimes(); }
 async function saveExecTime() {
-  const times = pushTimes.filter(t => /^\d{2}:\d{2}$/.test(t)).sort();
-  if (!times.length) return toast('请至少保留一个推送时间点');
   const r = await api('/api/admin/settings', { method: 'POST', body: {
-    exec_push_times: JSON.stringify(times),
+    exec_push_times: JSON.stringify({ breakfast: $('exPushBreakfast').value || '', lunch: $('exPushLunch').value || '', dinner: $('exPushDinner').value || '' }),
     exec_deadline: $('exDeadline').value,
     exec_cancel_deadline: JSON.stringify({ breakfast: $('exCancelBreakfast').value || '08:30', lunch: $('exCancelLunch').value || '11:30', dinner: $('exCancelDinner').value || '18:30' })
   } });
@@ -417,14 +411,25 @@ async function loadExecStatus() {
   const r = await api('/api/admin/exec-status');
   if (r.code !== 0) return toast(r.msg);
   const d = r.data;
-  $('execStatusMeta').textContent = `｜ ${d.date} ${d.isWorkday ? '（工作日）' : '（非工作日）'} ｜ 推送：${d.push ? d.push.stats || '已推送' : '未推送'}`;
+  const pushTxt = (d.pushes || []).map(p => `${({breakfast:'早',lunch:'午',dinner:'晚',manual:'手'}[p.target_meal] || p.target_meal || '')}推:${p.stats || '已推'}`).join(' ｜ ') || '未推送';
+  $('execStatusMeta').textContent = `｜ ${d.date} ${d.isWorkday ? '（工作日）' : '（非工作日）'} ｜ ${pushTxt}`;
+  const cfMap = {};
+  (d.confirms || []).forEach(c => { cfMap[c.exec_id + '_' + c.meal_type] = c; });
+  const M = { breakfast: '早', lunch: '午', dinner: '晚' };
   const S = { yes: '<span class="tag assigned">就餐</span>', no: '<span class="tag rejected">不就餐</span>', pending: '<span style="color:#999">未确认</span>' };
-  $('execStatusBody').innerHTML = d.rows.map(x => `<tr>
-    <td><b>${x.name}</b>${x.enabled ? '' : ' <span class="tag rejected">停用</span>'}</td><td>${x.mobile}</td><td>${x.dept || '-'}</td>
-    <td>${S[x.status || 'pending']}</td>
-    <td>${x.status === 'yes' ? `${(x.meal_type||'').split(',').map(m => ({breakfast:'早',lunch:'午',dinner:'晚'}[m]||m)).join('+')} · ${x.headcount} 人` : '-'}</td>
-    <td>${x.confirm_at ? x.confirm_at.slice(5, 16) : '-'}</td>
-  </tr>`).join('') || '<tr><td colspan="6" style="text-align:center;color:#999">名单为空</td></tr>';
+  $('execStatusBody').innerHTML = (d.execs || []).map(x => {
+    const cells = (x.meal_type || '').split(',').map(m => {
+      const c = cfMap[x.id + '_' + m];
+      const st = c?.status || 'pending';
+      return `${M[m] || m}：${S[st]}${st === 'yes' ? ` ${c.headcount}人` : ''}`;
+    }).join('　');
+    const lastAt = (d.confirms || []).filter(c => c.exec_id === x.id && c.confirm_at).map(c => c.confirm_at).sort().pop();
+    return `<tr>
+      <td><b>${x.name}</b>${x.enabled ? '' : ' <span class="tag rejected">停用</span>'}</td><td>${x.mobile}</td><td>${x.dept || '-'}</td>
+      <td>${cells || '-'}</td>
+      <td>${lastAt ? lastAt.slice(5, 16) : '-'}</td>
+    </tr>`;
+  }).join('') || '<tr><td colspan="5" style="text-align:center;color:#999">名单为空</td></tr>';
 }
 
 // ===== 系统设置 =====

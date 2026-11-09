@@ -12,15 +12,21 @@
   .sub { color: #7a8598; font-size: 13.5px; margin-bottom: 18px; }
   .info { background: #f7f9fc; border-radius: 10px; padding: 14px 16px; margin-bottom: 18px; font-size: 14px; line-height: 2; }
   .info b { color: #185fa5; }
-  .row { display: flex; gap: 12px; margin-bottom: 16px; align-items: center; }
-  .row label { width: 64px; color: #666; font-size: 13.5px; }
-  select, input { flex: 1; padding: 9px 12px; border: 1px solid #dfe5ee; border-radius: 8px; font-size: 14px; }
+  .meal-block { border: 1px solid #e6ebf3; border-radius: 12px; padding: 16px 14px; margin-bottom: 14px; }
+  .meal-title { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
+  .meal-title b { font-size: 15.5px; }
+  .meal-title .st { font-size: 13px; color: #999; }
+  .meal-title .st.yes { color: #0f6e56; font-weight: 600; }
+  .meal-title .st.no { color: #b23a3a; font-weight: 600; }
+  .row { display: flex; gap: 12px; margin-bottom: 12px; align-items: center; }
+  .row label { width: 52px; color: #666; font-size: 13.5px; }
+  input { flex: 1; padding: 9px 12px; border: 1px solid #dfe5ee; border-radius: 8px; font-size: 14px; }
   .btns { display: flex; gap: 12px; }
-  button { flex: 1; padding: 13px 0; border: none; border-radius: 10px; font-size: 15px; font-weight: 600; cursor: pointer; }
+  button { flex: 1; padding: 12px 0; border: none; border-radius: 10px; font-size: 15px; font-weight: 600; cursor: pointer; }
   .yes { background: #0f6e56; color: #fff; }
   .no { background: #b23a3a; color: #fff; }
-  .cancel { background: #fff; color: #666; border: 1px solid #ccc; font-weight: 400; }
   .cancel-solid { background: #b23a3a; color: #fff; }
+  .limit-tip { background: #fdf3f3; border: 1px solid #e8c8c8; border-radius: 10px; padding: 10px 12px; color: #a32d2d; font-size: 13px; text-align: center; }
   .result { text-align: center; padding: 20px 0; font-size: 16px; font-weight: 600; }
   .result.ok { color: #0f6e56; }
   .result.err { color: #a32d2d; }
@@ -44,35 +50,43 @@ async function load() {
   const d = r.data;
   const week = ['日','一','二','三','四','五','六'][new Date(D + 'T00:00:00+08:00').getDay()];
   document.getElementById('sub').textContent = `${d.name}${d.dept ? ' · ' + d.dept : ''}`;
-  const statusText = { pending: '尚未确认', yes: '已确认就餐', no: '已确认不就餐' }[d.status];
+  const blocks = d.meals.map(m => {
+    const st = { pending: '尚未确认', yes: '已确认就餐', no: '已确认不就餐' }[m.status];
+    const stCls = { pending: '', yes: 'yes', no: 'no' }[m.status];
+    let body;
+    if (m.status === 'pending') {
+      body = `<div class="row"><label>人数：</label><input id="hc_${m.meal_type}" type="number" min="1" max="99" value="${m.headcount}"></div>
+        <div class="btns">
+          <button class="yes" onclick="send('yes','${m.meal_type}')">确认就餐</button>
+          <button class="no" onclick="send('no','${m.meal_type}')">不就餐</button>
+        </div>`;
+    } else if (m.status === 'yes') {
+      body = m.can_cancel
+        ? `<div class="row"><label>人数：</label><input id="hc_${m.meal_type}" type="number" min="1" max="99" value="${m.headcount}"></div>
+           <div class="btns"><button class="cancel-solid" onclick="send('cancel','${m.meal_type}')">取消就餐（${m.cancel_deadline} 前可取消）</button></div>`
+        : `<div class="limit-tip">已超过取消截止时间（${m.cancel_deadline}），如需变更请联系管理员</div>`;
+    } else {
+      body = `<div class="btns"><button class="yes" onclick="send('yes','${m.meal_type}')">确认就餐</button></div>`;
+    }
+    return `<div class="meal-block">
+      <div class="meal-title"><b>${m.meal_name}</b><span class="st ${stCls}">${st}</span></div>
+      ${body}
+    </div>`;
+  }).join('');
   document.getElementById('content').innerHTML = `
     <div class="info">
       就餐日期：<b>${D}（周${week}）</b><br>
-      地点：<b>${d.place_name}</b><br>
-      当前状态：<b>${statusText}</b> ｜ 封账时间：${d.deadline}
+      地点：<b>${d.place_name}</b> ｜ 封账时间：${d.deadline}
     </div>
-    <div class="row"><label>餐别：</label><select id="meal">
-      ${['lunch','breakfast','dinner'].map(m => `<option value="${m}" ${d.meal_type.includes(m) ? 'selected' : ''}>${MEAL[m]}</option>`).join('')}
-    </select></div>
-    <div class="row"><label>人数：</label><input id="hc" type="number" min="1" max="99" value="${d.headcount}"></div>
-    ${d.status === 'pending'
-      ? `<div class="btns">
-          <button class="yes" onclick="send('yes')">确认就餐</button>
-          <button class="no" onclick="send('no')">不就餐</button>
-        </div>`
-      : d.status === 'yes'
-        ? (d.can_cancel
-          ? `<div class="btns"><button class="cancel-solid" onclick="send('cancel')">取消就餐（${d.cancel_deadline} 前可取消）</button></div>`
-          : `<div style="background:#fdf3f3;border:1px solid #e8c8c8;border-radius:10px;padding:12px;color:#a32d2d;font-size:13.5px;text-align:center">已超过取消截止时间（${d.cancel_deadline}），如需变更请联系管理员</div>`)
-        : `<div class="btns"><button class="yes" onclick="send('yes')">确认就餐</button></div>`}
-    <div class="tip">确认结果将自动计入就餐统计；封账前可随时修改或取消。</div>`;
+    ${blocks}
+    <div class="tip">各餐别独立确认，结果自动计入就餐统计。</div>`;
 }
 
-async function send(status) {
-  const meal = document.getElementById('meal').value;
-  const hc = +document.getElementById('hc').value || 1;
+async function send(status, meal) {
+  const hcEl = document.getElementById('hc_' + meal);
+  const hc = hcEl ? (+hcEl.value || 1) : 1;
   const r = await fetch('/api/exec/confirm', { method: 'POST', headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ e: E, d: D, t: T, status, meal_type: meal, headcount: hc }) }).then(r => r.json());
+    body: JSON.stringify({ e: E, d: D, t: T, status, meal, headcount: hc }) }).then(r => r.json());
   renderMsg(r.msg || (r.code === 0 ? '已提交' : '提交失败'), r.code !== 0, true);
   if (r.code === 0) setTimeout(load, 1200);
 }
