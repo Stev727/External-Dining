@@ -245,16 +245,23 @@ textarea { width: 100%; min-height: 60px; padding: 9px 12px; border: 1px solid #
       <table><thead><tr><th>姓名</th><th>手机号</th><th>部门</th><th>默认餐别</th><th>状态</th><th>操作</th></tr></thead><tbody id="execBody"></tbody></table>
     </div>
     <div class="card">
-      <h3>推送时间 <span style="font-weight:400;color:#888;font-size:13px">｜ 到点自动触发，每天只推一次；目标日=明天且为工作日</span></h3>
+      <h3>推送时间 <span style="font-weight:400;color:#888;font-size:13px">｜ 每天可设多个时间点，到点自动触发；第 2 个起仅提醒未确认人员；目标日=明天且为工作日</span></h3>
+      <div id="pushTimeRows" style="display:flex;flex-direction:column;gap:8px;margin-bottom:10px"></div>
       <div class="row">
-        <b style="width:90px">推送时间：</b><input id="exPushTime" type="time" style="width:120px">
-        <b style="width:90px">封账时间：</b><input id="exDeadline" type="time" style="width:120px">
+        <button onclick="addPushTime()">＋ 添加时间点</button>
+        <b style="width:90px;margin-left:12px">封账时间：</b><input id="exDeadline" type="time" style="width:120px">
         <button class="primary" onclick="saveExecTime()">保存</button>
-        <span style="color:#999;font-size:12px">推送时间到点后向名单内全员发钉钉确认链接；封账时间仅用于页面上提示</span>
+        <span style="color:#999;font-size:12px">封账时间用于确认页提示</span>
       </div>
     </div>
     <div class="card">
-      <h3>工作日历 <span style="font-weight:400;color:#888;font-size:13px">｜ 默认周一~周六上班；点击切换覆盖公司节假日安排</span></h3>
+      <h3>工作日历 <span style="font-weight:400;color:#888;font-size:13px">｜ 默认周一~周六上班；点击日期切换 上班/休息，可翻月设置公司节假日</span></h3>
+      <div style="display:flex;gap:10px;align-items:center;margin-bottom:12px">
+        <button onclick="calNav(-1)">← 上一月</button>
+        <b id="calMonth" style="font-size:15px;min-width:90px;text-align:center"></b>
+        <button onclick="calNav(1)">下一月 →</button>
+        <button onclick="calNav(0)">本月</button>
+      </div>
       <div id="workdayChips" style="display:flex;flex-wrap:wrap;gap:8px"></div>
     </div>
     <div class="card">
@@ -341,20 +348,48 @@ async function delExec(id, name) { if (!confirm(`删除高管「${name}」？`))
 async function loadExecTime() {
   const r = await api('/api/admin/settings');
   if (r.code !== 0) return;
-  $('exPushTime').value = r.data.exec_push_time || '15:00';
+  let times = [];
+  try { times = JSON.parse(r.data.exec_push_times || '[]'); } catch (e) { /* ignore */ }
+  if (!times.length && r.data.exec_push_time) times = [r.data.exec_push_time];
+  pushTimes = times.length ? times : ['11:00', '17:00'];
   $('exDeadline').value = r.data.exec_deadline || '20:00';
+  renderPushTimes();
 }
+let pushTimes = [];
+function renderPushTimes() {
+  $('pushTimeRows').innerHTML = pushTimes.map((t, i) =>
+    `<div class="row" style="margin-bottom:0"><b style="width:90px">时间点 ${i + 1}：</b>
+     <input type="time" style="width:120px" value="${t}" onchange="pushTimes[${i}]=this.value">
+     ${pushTimes.length > 1 ? `<button class="danger" onclick="pushTimes.splice(${i},1);renderPushTimes()">删除</button>` : ''}</div>`).join('');
+}
+function addPushTime() { pushTimes.push('12:00'); renderPushTimes(); }
 async function saveExecTime() {
-  const r = await api('/api/admin/settings', { method: 'POST', body: { exec_push_time: $('exPushTime').value, exec_deadline: $('exDeadline').value } });
+  const times = pushTimes.filter(t => /^\d{2}:\d{2}$/.test(t)).sort();
+  if (!times.length) return toast('请至少保留一个推送时间点');
+  const r = await api('/api/admin/settings', { method: 'POST', body: { exec_push_times: JSON.stringify(times), exec_deadline: $('exDeadline').value } });
   r.code === 0 ? toast('推送时间已保存') : toast(r.msg);
 }
 
+let calMonth = null; // YYYY-MM，null=当月
+function calNav(delta) {
+  if (delta === 0) { calMonth = null; }
+  else {
+    const [y, m] = (calMonth || new Date().toLocaleString('sv-SE', { timeZone: 'Asia/Shanghai' }).slice(0, 7)).split('-').map(Number);
+    const d = new Date(y, m - 1 + delta, 1);
+    calMonth = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+  }
+  loadWorkdays();
+}
 async function loadWorkdays() {
-  const r = await api('/api/admin/workdays');
-  if (r.code !== 0) return;
-  $('workdayChips').innerHTML = r.data.map(x => {
-    const w = ['日','一','二','三','四','五','六'][new Date(x.d + 'T00:00:00+08:00').getDay()];
-    return `<button onclick="toggleWorkday('${x.d}',${x.work ? 0 : 1})" style="padding:6px 10px;border-radius:8px;font-size:12px;${x.today ? 'border:2px solid #185FA5;' : ''}${x.work ? 'background:#E6F1FB;color:#185FA5' : 'background:#FBEAEA;color:#A32D2D;text-decoration:line-through'}">${x.d.slice(5)} 周${w}</button>`;
+  const month = calMonth || '';
+  const r = await api('/api/admin/workdays' + (month ? '?month=' + month : ''));
+  if (r.code !== 0) return toast(r.msg);
+  calMonth = r.data.month;
+  $('calMonth').textContent = calMonth.replace('-', '年') + '月';
+  const weekNames = ['日','一','二','三','四','五','六'];
+  $('workdayChips').innerHTML = r.data.list.map(x => {
+    const w = weekNames[new Date(+x.d.slice(0,4), +x.d.slice(5,7)-1, +x.d.slice(8,10)).getDay()];
+    return `<button onclick="toggleWorkday('${x.d}',${x.work ? 0 : 1})" style="padding:6px 10px;border-radius:8px;font-size:12px;${x.today ? 'border:2px solid #185FA5;' : ''}${x.work ? 'background:#E6F1FB;color:#185FA5' : 'background:#FBEAEA;color:#A32D2D;text-decoration:line-through'}" title="${x.d} 周${w}">${x.d.slice(5)} 周${w}</button>`;
   }).join('');
 }
 async function toggleWorkday(d, work) {

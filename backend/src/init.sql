@@ -151,8 +151,10 @@ CREATE TABLE IF NOT EXISTS meal_exec_confirm (
 ) COMMENT '高管就餐确认记录';
 
 CREATE TABLE IF NOT EXISTS meal_exec_push (
-  d DATE PRIMARY KEY,
+  d DATE NOT NULL,
+  push_time VARCHAR(10) NOT NULL DEFAULT '' COMMENT '触发时间点或 manual',
   target_date DATE NOT NULL COMMENT '提醒的目标就餐日',
   pushed_at DATETIME NOT NULL,
-  stats VARCHAR(200) DEFAULT ''
-) COMMENT '高管就餐推送日志（防重复推送）';
+  stats VARCHAR(200) DEFAULT '',
+  PRIMARY KEY (d, push_time)
+) COMMENT '高管就餐推送日志（按天+时间点防重复）';

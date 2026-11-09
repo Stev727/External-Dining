@@ -383,7 +383,7 @@ router.post('/dept', auth, requireAdmin, async (req, res) => {
 });
 
 // ===== 系统设置（仅管理员）：钉钉应用信息等，推广部署时每家公司在界面各自配置 =====
-const SETTING_KEYS = ['dingtalk_appkey', 'dingtalk_appsecret', 'dingtalk_agent_id', 'dingtalk_webhook', 'dingtalk_secret', 'admin_base_url', 'exec_push_time', 'exec_deadline'];
+const SETTING_KEYS = ['dingtalk_appkey', 'dingtalk_appsecret', 'dingtalk_agent_id', 'dingtalk_webhook', 'dingtalk_secret', 'admin_base_url', 'exec_push_times', 'exec_deadline'];
 const SECRET_KEYS = ['dingtalk_appsecret', 'dingtalk_secret'];
 function maskSecret(v) {
   if (!v) return '';
@@ -435,15 +435,20 @@ router.delete('/execs/:id', auth, requireAdmin, async (req, res) => {
   res.json({ code: 0 });
 });
 
-// 工作日历：未来 30 天（默认周一~周六上班，meal_workday 覆盖项叠加）
+// 工作日历：按月查看（默认当月，北京时间），默认周一~周六上班 + meal_workday 覆盖项
 router.get('/workdays', auth, requireAdmin, async (req, res) => {
+  const month = /^\d{4}-\d{2}$/.test(req.query.month || '')
+    ? req.query.month
+    : new Date().toLocaleString('sv-SE', { timeZone: 'Asia/Shanghai' }).slice(0, 7);
+  const [y, m] = month.split('-').map(Number);
+  const days = new Date(y, m, 0).getDate();
+  const todayBJ = new Date().toLocaleString('sv-SE', { timeZone: 'Asia/Shanghai' }).slice(0, 10);
   const list = [];
-  const now = new Date();
-  for (let i = 0; i < 30; i++) {
-    const d = fmtD(new Date(now.getTime() + i * 86400000));
-    list.push({ d, work: await isWorkday(d), today: i === 0 });
+  for (let i = 1; i <= days; i++) {
+    const d = `${month}-${String(i).padStart(2, '0')}`;
+    list.push({ d, work: await isWorkday(d), today: d === todayBJ });
   }
-  res.json({ code: 0, data: list });
+  res.json({ code: 0, data: { month, list } });
 });
 router.post('/workdays', auth, requireAdmin, async (req, res) => {
   const { d, work } = req.body;
